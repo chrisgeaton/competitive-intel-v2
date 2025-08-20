@@ -3,10 +3,13 @@ Main FastAPI application for the User Config Service.
 """
 
 import logging
+from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.database import init_db, close_db
@@ -15,7 +18,7 @@ from app.middleware import (
     RateLimitMiddleware, 
     AuthenticationMiddleware
 )
-from app.routes import auth_router
+from app.routers import auth_router, users_router
 
 # Configure logging
 logging.basicConfig(
@@ -49,10 +52,37 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Authentication and user management service for competitive intelligence platform",
+    description="""
+## Competitive Intelligence v2 - User Config Service
+
+A comprehensive user management and authentication API for competitive intelligence platform.
+
+### Features
+- **Secure Authentication**: JWT-based authentication with refresh tokens
+- **User Management**: Complete profile management and preferences
+- **Strategic Profiles**: Business context for personalized intelligence
+- **Session Management**: Multi-device session handling
+- **Security**: Enterprise-grade security with rate limiting and validation
+
+### Authentication
+All protected endpoints require a Bearer token in the Authorization header:
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+Get your token by using the `/api/v1/auth/login` endpoint.
+    """,
     lifespan=lifespan,
     docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None
+    redoc_url="/redoc" if settings.DEBUG else None,
+    contact={
+        "name": "Competitive Intelligence v2 Support",
+        "email": "support@competitive-intel.com"
+    },
+    license_info={
+        "name": "MIT License",
+        "identifier": "MIT"
+    }
 )
 
 # Add CORS middleware
@@ -70,7 +100,8 @@ app.add_middleware(RateLimitMiddleware, requests_per_minute=settings.RATE_LIMIT_
 app.add_middleware(AuthenticationMiddleware)
 
 # Include routers
-app.include_router(auth_router, prefix="/api/v1")
+app.include_router(auth_router)
+app.include_router(users_router)
 
 
 @app.get("/")
@@ -111,27 +142,52 @@ async def health_check():
         )
 
 
-@app.exception_handler(404)
-async def not_found_handler(request: Request, exc):
-    """Custom 404 handler."""
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle request validation errors."""
+    logger.warning(f"Validation error on {request.url.path}: {exc.errors()}")
     return JSONResponse(
-        status_code=404,
+        status_code=422,
         content={
-            "detail": "The requested resource was not found",
-            "path": str(request.url.path)
+            "detail": "Validation error",
+            "errors": exc.errors(),
+            "type": "validation_error"
+        }
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions."""
+    if exc.status_code == 404:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": "The requested resource was not found",
+                "path": str(request.url.path),
+                "type": "not_found"
+            }
+        )
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "type": "http_error"
         }
     )
 
 
 @app.exception_handler(500)
 async def internal_error_handler(request: Request, exc):
-    """Custom 500 handler."""
+    """Handle internal server errors."""
     logger.error(f"Internal server error on {request.url.path}: {exc}")
     return JSONResponse(
         status_code=500,
         content={
             "detail": "Internal server error",
-            "type": "server_error"
+            "type": "server_error",
+            "timestamp": str(datetime.utcnow())
         }
     )
 
