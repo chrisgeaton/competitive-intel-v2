@@ -200,4 +200,4 @@ System ready for deployment with enhanced maintainability and reduced complexity
 
 ---
 
-*For technical details, see `optimization_analysis_before.txt` and `optimization_report.txt` in the project root.*
+*For technical details, see [`OPTIMIZATION_ANALYSIS_BEFORE.md`](./OPTIMIZATION_ANALYSIS_BEFORE.md) and [`OPTIMIZATION_DETAILED_REPORT.md`](./OPTIMIZATION_DETAILED_REPORT.md) in this folder.*
