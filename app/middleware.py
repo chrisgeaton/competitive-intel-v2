@@ -8,17 +8,16 @@ from typing import Optional, Dict, Any
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 
-from fastapi import Request, Response, HTTPException, status
+from fastapi import Request, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
 from app.config import settings, SECURITY_HEADERS
 from app.auth import auth_service
-from app.database import get_db_session
 from app.models.user import User
+from app.utils.exceptions import errors
 
 logger = logging.getLogger(__name__)
 
@@ -142,17 +141,11 @@ class JWTBearer(HTTPBearer):
         
         if credentials:
             if not credentials.scheme == "Bearer":
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authentication scheme"
-                )
+                raise errors.unauthorized("Invalid authentication scheme")
             
             token_data = auth_service.decode_token(credentials.credentials)
             if not token_data:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token or expired token"
-                )
+                raise errors.unauthorized("Invalid token or expired token")
             
             # Add token data to request state for use in endpoints
             request.state.token_data = token_data
@@ -218,7 +211,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 )
             
             # Verify user exists and is active
-            async with get_db_session() as db:
+            from app.database import db_manager
+            async with db_manager.get_session() as db:
                 try:
                     result = await db.execute(
                         select(User).where(User.id == token_data.user_id)
@@ -263,10 +257,7 @@ async def get_current_user(request: Request) -> User:
         HTTPException: If user not authenticated
     """
     if not hasattr(request.state, "current_user"):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated"
-        )
+        raise errors.unauthorized("Not authenticated")
     
     return request.state.current_user
 
@@ -287,10 +278,7 @@ async def get_current_active_user(request: Request) -> User:
     user = await get_current_user(request)
     
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
+        raise errors.bad_request("Inactive user")
     
     return user
 

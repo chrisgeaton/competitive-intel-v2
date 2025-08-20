@@ -5,7 +5,7 @@ Main FastAPI application for the User Config Service.
 import logging
 from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -122,7 +122,6 @@ async def health_check():
     try:
         db_healthy = await db_manager.health_check()
         
-        from datetime import datetime
         return {
             "status": "healthy" if db_healthy else "unhealthy",
             "database": "connected" if db_healthy else "disconnected",
@@ -130,7 +129,6 @@ async def health_check():
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        from datetime import datetime
         return JSONResponse(
             status_code=503,
             content={

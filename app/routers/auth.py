@@ -3,20 +3,16 @@ Authentication routes for the Competitive Intelligence v2 API.
 """
 
 import logging
-from datetime import datetime
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.database import get_db_session
 from app.auth import auth_service
 from app.models.user import User, UserSession
-from app.schemas.auth import (
-    UserRegister, UserLogin, Token, UserResponse,
-    PasswordChange, SessionResponse
-)
-from app.middleware import get_current_user, get_current_active_user
+from app.schemas.auth import UserRegister, UserLogin, Token, UserResponse
+from app.middleware import get_current_user
+from app.utils.exceptions import errors, db_handler
+from app.utils.database import db_helpers
 
 logger = logging.getLogger(__name__)
 
@@ -39,18 +35,9 @@ async def register_user(
     
     Returns the created user profile without sensitive information.
     """
-    try:
+    async def _register_operation():
         # Check if user already exists
-        result = await db.execute(
-            select(User).where(User.email == user_data.email)
-        )
-        existing_user = result.scalar_one_or_none()
-        
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User with this email already exists"
-            )
+        await db_helpers.check_email_unique(db, user_data.email)
         
         # Hash password and create user
         hashed_password = auth_service.hash_password(user_data.password)
@@ -64,22 +51,15 @@ async def register_user(
         )
         
         db.add(new_user)
-        await db.commit()
+        await db_helpers.safe_commit(db, "user registration")
         await db.refresh(new_user)
         
         logger.info(f"New user registered: {new_user.email}")
-        
         return UserResponse.model_validate(new_user)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error registering user: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to register user"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "register user", _register_operation, db
+    )
 
 
 @router.post("/login", response_model=Token)
@@ -98,20 +78,14 @@ async def login_user(
     
     Returns access token, refresh token, and token metadata.
     """
-    try:
+    async def _login_operation():
         # Authenticate user
         user = await auth_service.authenticate_user(
-            db,
-            user_credentials.email,
-            user_credentials.password
+            db, user_credentials.email, user_credentials.password
         )
         
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
+            raise errors.unauthorized("Invalid credentials")
         
         # Create session
         session = await auth_service.create_user_session(
@@ -134,18 +108,13 @@ async def login_user(
         return Token(
             access_token=access_token,
             token_type="bearer",
-            expires_in=3600,  # 1 hour
+            expires_in=3600,
             refresh_token=refresh_token
         )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error during login: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "login user", _login_operation, db
+    )
 
 
 @router.post("/logout")
@@ -159,7 +128,7 @@ async def logout_user(
     
     Invalidates the current session token to prevent further use.
     """
-    try:
+    async def _logout_operation():
         # Get session token from authorization header
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
@@ -168,25 +137,19 @@ async def logout_user(
             
             if token_data and token_data.session_id:
                 # Find and revoke the session
-                result = await db.execute(
-                    select(UserSession).where(UserSession.id == token_data.session_id)
+                session = await db_helpers.get_model_by_field(
+                    db, UserSession, "id", token_data.session_id
                 )
-                session = result.scalar_one_or_none()
                 
                 if session:
-                    await db.delete(session)
-                    await db.commit()
+                    await db_helpers.safe_delete(db, session, "logout session")
         
         logger.info(f"User logged out: {current_user.email}")
-        
         return {"message": "Successfully logged out"}
-        
-    except Exception as e:
-        logger.error(f"Error during logout: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Logout failed"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "logout user", _logout_operation, db, rollback_on_error=False
+    )
 
 
 @router.post("/refresh", response_model=Token)
@@ -201,27 +164,17 @@ async def refresh_token(
     
     - **refresh_token**: Valid refresh token from login response
     """
-    try:
+    async def _refresh_operation():
         # Decode refresh token
         token_data = auth_service.decode_token(refresh_token)
         
         if not token_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token"
-            )
+            raise errors.unauthorized("Invalid refresh token")
         
         # Verify user exists and is active
-        result = await db.execute(
-            select(User).where(User.id == token_data.user_id)
+        user = await db_helpers.get_user_by_id(
+            db, token_data.user_id, validate_exists=True, validate_active=True
         )
-        user = result.scalar_one_or_none()
-        
-        if not user or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found or inactive"
-            )
         
         # Create new access token
         new_token_data = {
@@ -237,14 +190,9 @@ async def refresh_token(
             access_token=new_access_token,
             token_type="bearer",
             expires_in=3600,
-            refresh_token=refresh_token  # Keep same refresh token
+            refresh_token=refresh_token
         )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error refreshing token: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to refresh token"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "refresh token", _refresh_operation, db, rollback_on_error=False
+    )

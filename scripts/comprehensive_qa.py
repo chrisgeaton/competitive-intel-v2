@@ -66,7 +66,7 @@ class ComprehensiveQA:
             'app.models.user', 'app.models.strategic_profile', 
             'app.models.tracking', 'app.models.delivery',
             'app.schemas.auth', 'app.schemas.user',
-            'app.middleware', 'app.routes.auth', 'app.main'
+            'app.middleware', 'app.routers.auth', 'app.main'
         ]
         
         for module in critical_modules:

@@ -4,8 +4,7 @@ User management routes for the Competitive Intelligence v2 API.
 
 import logging
 from datetime import datetime
-from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -13,16 +12,16 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db_session
 from app.auth import auth_service
 from app.models.user import User
-from app.models.strategic_profile import UserStrategicProfile, UserFocusArea
-from app.models.delivery import UserDeliveryPreferences
+from app.models.strategic_profile import UserStrategicProfile
 from app.schemas.auth import UserResponse, PasswordChange
 from app.schemas.user import (
     UserUpdate, UserProfile,
     StrategicProfileCreate, StrategicProfileUpdate, StrategicProfileResponse,
-    FocusAreaCreate, FocusAreaUpdate, FocusAreaResponse,
-    DeliveryPreferencesUpdate, DeliveryPreferencesResponse
+    FocusAreaResponse, DeliveryPreferencesResponse
 )
-from app.middleware import get_current_user, get_current_active_user
+from app.middleware import get_current_active_user
+from app.utils.exceptions import errors, db_handler, validators
+from app.utils.database import db_helpers
 
 logger = logging.getLogger(__name__)
 
@@ -43,19 +42,11 @@ async def get_user_profile(
     - Delivery preferences
     - Account status and subscription information
     """
-    try:
+    async def _get_profile_operation():
         # Load user with all relationships
-        result = await db.execute(
-            select(User)
-            .where(User.id == current_user.id)
-            .options(
-                # Load all related data
-                selectinload(User.strategic_profile),
-                selectinload(User.focus_areas),
-                selectinload(User.delivery_preferences)
-            )
+        user_with_relations = await db_helpers.get_user_by_id(
+            db, current_user.id, load_relations=True, validate_exists=True
         )
-        user_with_relations = result.scalar_one()
         
         # Build profile response
         profile_data = {
@@ -104,13 +95,10 @@ async def get_user_profile(
             profile_data["delivery_preferences"] = DeliveryPreferencesResponse.from_orm_model(prefs)
         
         return UserProfile(**profile_data)
-        
-    except Exception as e:
-        logger.error(f"Error getting user profile: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get user profile"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "get user profile", _get_profile_operation, db, rollback_on_error=False
+    )
 
 
 @router.put("/profile", response_model=UserResponse)
@@ -128,42 +116,30 @@ async def update_user_profile(
     
     Note: Email changes may require verification in production systems.
     """
-    try:
+    async def _update_profile_operation():
+        # Get fresh user instance in current session
+        user = await db_helpers.get_user_by_id(
+            db, current_user.id, validate_exists=True
+        )
+        
         # Check if email is being changed and already exists
-        if user_data.email and user_data.email != current_user.email:
-            result = await db.execute(
-                select(User).where(User.email == user_data.email)
-            )
-            existing_user = result.scalar_one_or_none()
-            
-            if existing_user:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email address already in use"
-                )
-            
-            current_user.email = user_data.email
+        if user_data.email and user_data.email != user.email:
+            await db_helpers.check_email_unique(db, user_data.email, user.id)
+            user.email = user_data.email
         
         # Update name if provided
         if user_data.name:
-            current_user.name = user_data.name
+            user.name = user_data.name
         
-        await db.commit()
-        await db.refresh(current_user)
+        await db_helpers.safe_commit(db, "profile update")
+        await db.refresh(user)
         
-        logger.info(f"Profile updated for user: {current_user.email}")
-        
-        return UserResponse.model_validate(current_user)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating user profile: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update profile"
-        )
+        logger.info(f"Profile updated for user: {user.email}")
+        return UserResponse.model_validate(user)
+    
+    return await db_handler.handle_db_operation(
+        "update user profile", _update_profile_operation, db
+    )
 
 
 @router.post("/change-password")
@@ -183,37 +159,29 @@ async def change_password(
     - **current_password**: User's current password for verification
     - **new_password**: New strong password meeting security requirements
     """
-    try:
+    async def _change_password_operation():
         # Verify current password
-        if not auth_service.verify_password(password_data.current_password, current_user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect"
-            )
+        validators.validate_password_match(
+            auth_service.verify_password(password_data.current_password, current_user.password_hash),
+            "Current password is incorrect"
+        )
         
         # Hash new password
         new_hashed_password = auth_service.hash_password(password_data.new_password)
         
         # Update user password
         current_user.password_hash = new_hashed_password
-        await db.commit()
+        await db_helpers.safe_commit(db, "password change")
         
         # Revoke all other sessions for security
         await auth_service.revoke_all_user_sessions(db, current_user.id)
         
         logger.info(f"Password changed for user: {current_user.email}")
-        
         return {"message": "Password changed successfully. Please log in again on other devices."}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error changing password: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to change password"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "change password", _change_password_operation, db
+    )
 
 
 @router.post("/strategic-profile", response_model=StrategicProfileResponse, status_code=status.HTTP_201_CREATED)
@@ -232,18 +200,14 @@ async def create_strategic_profile(
     - **strategic_goals**: List of key strategic objectives
     - **organization_size**: Size category (small, medium, large, enterprise)
     """
-    try:
+    async def _create_profile_operation():
         # Check if profile already exists
-        result = await db.execute(
-            select(UserStrategicProfile).where(UserStrategicProfile.user_id == current_user.id)
+        existing_profile = await db_helpers.get_model_by_field(
+            db, UserStrategicProfile, "user_id", current_user.id
         )
-        existing_profile = result.scalar_one_or_none()
         
         if existing_profile:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Strategic profile already exists. Use PUT to update."
-            )
+            raise errors.conflict("Strategic profile already exists. Use PUT to update.")
         
         # Create new strategic profile
         new_profile = UserStrategicProfile(
@@ -256,22 +220,15 @@ async def create_strategic_profile(
         )
         
         db.add(new_profile)
-        await db.commit()
+        await db_helpers.safe_commit(db, "strategic profile creation")
         await db.refresh(new_profile)
         
         logger.info(f"Strategic profile created for user: {current_user.email}")
-        
         return StrategicProfileResponse.model_validate(new_profile)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating strategic profile: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create strategic profile"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "create strategic profile", _create_profile_operation, db
+    )
 
 
 @router.put("/strategic-profile", response_model=StrategicProfileResponse)
@@ -286,18 +243,12 @@ async def update_strategic_profile(
     Updates existing strategic profile with new business context information.
     Only provided fields will be updated.
     """
-    try:
+    async def _update_profile_operation():
         # Get existing profile
-        result = await db.execute(
-            select(UserStrategicProfile).where(UserStrategicProfile.user_id == current_user.id)
+        profile = await db_helpers.get_model_by_field(
+            db, UserStrategicProfile, "user_id", current_user.id,
+            validate_exists=True, resource_name="Strategic profile"
         )
-        profile = result.scalar_one_or_none()
-        
-        if not profile:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Strategic profile not found. Create one first."
-            )
         
         # Update fields if provided
         if profile_data.industry is not None:
@@ -313,22 +264,15 @@ async def update_strategic_profile(
         
         profile.updated_at = datetime.utcnow()
         
-        await db.commit()
+        await db_helpers.safe_commit(db, "strategic profile update")
         await db.refresh(profile)
         
         logger.info(f"Strategic profile updated for user: {current_user.email}")
-        
         return StrategicProfileResponse.model_validate(profile)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating strategic profile: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update strategic profile"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "update strategic profile", _update_profile_operation, db
+    )
 
 
 @router.get("/strategic-profile", response_model=StrategicProfileResponse)
@@ -341,28 +285,17 @@ async def get_strategic_profile(
     
     Returns the user's business context and strategic objectives.
     """
-    try:
-        result = await db.execute(
-            select(UserStrategicProfile).where(UserStrategicProfile.user_id == current_user.id)
+    async def _get_strategic_profile_operation():
+        profile = await db_helpers.get_model_by_field(
+            db, UserStrategicProfile, "user_id", current_user.id,
+            validate_exists=True, resource_name="Strategic profile"
         )
-        profile = result.scalar_one_or_none()
-        
-        if not profile:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Strategic profile not found"
-            )
         
         return StrategicProfileResponse.model_validate(profile)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting strategic profile: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get strategic profile"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "get strategic profile", _get_strategic_profile_operation, db, rollback_on_error=False
+    )
 
 
 @router.delete("/account")
@@ -381,31 +314,22 @@ async def delete_user_account(
     
     - **password_confirmation**: Current password for security verification
     """
-    try:
+    async def _delete_account_operation():
         # Verify password for security
-        if not auth_service.verify_password(password_confirmation, current_user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password confirmation incorrect"
-            )
+        validators.validate_password_match(
+            auth_service.verify_password(password_confirmation, current_user.password_hash),
+            "Password confirmation incorrect"
+        )
         
         # Revoke all sessions first
         await auth_service.revoke_all_user_sessions(db, current_user.id)
         
         # Delete user (cascade will handle related records)
-        await db.delete(current_user)
-        await db.commit()
+        await db_helpers.safe_delete(db, current_user, "delete user account")
         
         logger.info(f"User account deleted: {current_user.email}")
-        
         return {"message": "Account deleted successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting user account: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete account"
-        )
+    
+    return await db_handler.handle_db_operation(
+        "delete user account", _delete_account_operation, db
+    )
