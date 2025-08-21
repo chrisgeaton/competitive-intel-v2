@@ -294,3 +294,18 @@ class BaseDiscoveryEngine(ABC):
 
 # ContentExtractor functionality has been moved to ContentUtils
 # All content processing now uses the centralized ContentUtils class for consistency
+
+class ContentExtractor:
+    """Base class for content extraction utilities - replaced by ContentUtils."""
+    
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+    
+    def extract_text(self, html: str) -> str:
+        """Extract clean text from HTML."""
+        from app.discovery.utils import ContentUtils
+        return ContentUtils.extract_text_from_html(html)
+    
+    def extract_metadata(self, html: str) -> Dict[str, Any]:
+        """Extract metadata from HTML."""
+        return {}  # Basic implementation

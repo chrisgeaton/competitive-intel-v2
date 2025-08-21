@@ -3,9 +3,11 @@ Async utility functions for optimized batch processing and concurrent operations
 Standardizes async patterns across the discovery service.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
-from typing import List, Callable, Awaitable, TypeVar, Optional, Any, Dict
+from typing import List, Callable, Awaitable, TypeVar, Optional, Any, Dict, Generic
 from dataclasses import dataclass
 from datetime import datetime
 

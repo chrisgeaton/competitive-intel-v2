@@ -12,7 +12,7 @@ import hashlib
 import re
 
 from .base_engine import (
-    BaseDiscoveryEngine, DiscoveredItem, SourceType, ContentType, ContentExtractor
+    BaseDiscoveryEngine, DiscoveredItem, SourceType, ContentType
 )
 
 

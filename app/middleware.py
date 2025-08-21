@@ -171,7 +171,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/api/v1/strategic-profile/enums/organization-types",
         "/api/v1/strategic-profile/enums/roles",
         "/api/v1/strategic-profile/enums/strategic-goals",
-        "/api/v1/strategic-profile/enums/organization-sizes"
+        "/api/v1/strategic-profile/enums/organization-sizes",
+        "/api/v1/discovery/webhooks/sendgrid"
     }
     
     # Routes that require authentication
@@ -181,7 +182,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/api/v1/strategic-profile",
         "/api/v1/focus-areas",
         "/api/v1/entities",
-        "/api/v1/preferences"
+        "/api/v1/preferences",
+        "/api/v1/discovery"
     ]
     
     # Specific protected auth routes  

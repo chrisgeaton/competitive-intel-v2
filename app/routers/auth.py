@@ -14,6 +14,7 @@ from app.utils.router_base import (
 )
 
 base_ops = BaseRouterOperations(__name__)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 

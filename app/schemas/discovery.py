@@ -38,18 +38,40 @@ class ContentType(str, Enum):
 
 class EngagementType(str, Enum):
     """User engagement types for ML learning."""
+    # Email engagement types (internal format)
     EMAIL_OPEN = "email_open"
     EMAIL_CLICK = "email_click"
-    TIME_SPENT = "time_spent"
-    BOOKMARK = "bookmark"
-    SHARE = "share"
-    FEEDBACK_POSITIVE = "feedback_positive"
-    FEEDBACK_NEGATIVE = "feedback_negative"
     EMAIL_BOUNCE = "email_bounce"
     EMAIL_DROPPED = "email_dropped"
     EMAIL_SPAM = "email_spam"
     EMAIL_UNSUBSCRIBE = "email_unsubscribe"
     EMAIL_DELIVERED = "email_delivered"
+    EMAIL_PROCESSED = "email_processed"
+    EMAIL_DEFERRED = "email_deferred"
+    EMAIL_SPAMREPORT = "email_spamreport"
+    EMAIL_GROUP_UNSUBSCRIBE = "email_group_unsubscribe"
+    EMAIL_GROUP_RESUBSCRIBE = "email_group_resubscribe"
+    
+    # Raw SendGrid event types (for direct mapping)
+    OPEN = "open"
+    CLICK = "click"
+    BOUNCE = "bounce"
+    DROPPED = "dropped"
+    SPAM = "spam"
+    UNSUBSCRIBE = "unsubscribe"
+    DELIVERED = "delivered"
+    PROCESSED = "processed"
+    DEFERRED = "deferred"
+    SPAMREPORT = "spamreport"
+    GROUP_UNSUBSCRIBE = "group_unsubscribe"
+    GROUP_RESUBSCRIBE = "group_resubscribe"
+    
+    # User interaction types
+    TIME_SPENT = "time_spent"
+    BOOKMARK = "bookmark"
+    SHARE = "share"
+    FEEDBACK_POSITIVE = "feedback_positive"
+    FEEDBACK_NEGATIVE = "feedback_negative"
 
 
 class JobType(str, Enum):

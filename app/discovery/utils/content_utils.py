@@ -19,8 +19,8 @@ class ContentUtils:
     SENTENCE_PATTERN = re.compile(r'[.!?]+')
     URL_PATTERN = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
     EMAIL_PATTERN = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
-    QUOTE_PATTERN = re.compile(r'[""]')
-    APOSTROPHE_PATTERN = re.compile(r'['']')
+    QUOTE_PATTERN = re.compile(r'["\u201c\u201d]')
+    APOSTROPHE_PATTERN = re.compile(r"['\u2018\u2019]")
     PUNCTUATION_CLEANUP = re.compile(r'([!?]){2,}')
     
     # Comprehensive stop words set for better keyword extraction

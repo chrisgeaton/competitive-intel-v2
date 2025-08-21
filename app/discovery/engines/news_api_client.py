@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from urllib.parse import urlencode, quote
 
 from .base_engine import (
-    BaseDiscoveryEngine, DiscoveredItem, SourceType, ContentType, ContentExtractor
+    BaseDiscoveryEngine, DiscoveredItem, SourceType, ContentType
 )
 
 

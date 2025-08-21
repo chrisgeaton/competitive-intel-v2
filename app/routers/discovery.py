@@ -8,6 +8,7 @@ Following established User Config Service patterns with BaseRouterOperations.
 
 import json
 import asyncio
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List, Optional, Dict, Any, Union
@@ -261,7 +262,16 @@ async def delete_discovery_source(
 @router.get("/content", response_model=List[DiscoveredContentResponse])
 async def get_discovered_content(
     pagination: PaginationParams = Depends(),
-    filters: DiscoveryFilterRequest = Depends(),
+    source_types: Optional[List[str]] = Query(None, description="Filter by source types"),
+    content_types: Optional[List[str]] = Query(None, description="Filter by content types"),
+    min_relevance_score: Optional[float] = Query(None, ge=0.0, le=1.0, description="Minimum relevance score"),
+    min_credibility_score: Optional[float] = Query(None, ge=0.0, le=1.0, description="Minimum credibility score"),
+    min_freshness_score: Optional[float] = Query(None, ge=0.0, le=1.0, description="Minimum freshness score"),
+    published_after: Optional[datetime] = Query(None, description="Filter content published after this date"),
+    published_before: Optional[datetime] = Query(None, description="Filter content published before this date"),
+    competitive_relevance: Optional[List[str]] = Query(None, description="Filter by competitive relevance"),
+    is_delivered: Optional[bool] = Query(None, description="Filter by delivery status"),
+    exclude_duplicates: bool = Query(True, description="Exclude duplicate content"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db_session)
 ):
@@ -286,39 +296,39 @@ async def get_discovered_content(
     # Apply filters
     filter_conditions = []
     
-    if filters.source_types:
+    if source_types:
         source_ids = await db.execute(
-            select(DiscoveredSource.id).where(DiscoveredSource.source_type.in_(filters.source_types))
+            select(DiscoveredSource.id).where(DiscoveredSource.source_type.in_(source_types))
         )
         source_id_list = [row[0] for row in source_ids]
         if source_id_list:
             filter_conditions.append(DiscoveredContent.source_id.in_(source_id_list))
     
-    if filters.content_types:
-        filter_conditions.append(DiscoveredContent.content_type.in_(filters.content_types))
+    if content_types:
+        filter_conditions.append(DiscoveredContent.content_type.in_(content_types))
     
-    if filters.min_relevance_score is not None:
-        filter_conditions.append(DiscoveredContent.relevance_score >= filters.min_relevance_score)
+    if min_relevance_score is not None:
+        filter_conditions.append(DiscoveredContent.relevance_score >= min_relevance_score)
     
-    if filters.min_credibility_score is not None:
-        filter_conditions.append(DiscoveredContent.credibility_score >= filters.min_credibility_score)
+    if min_credibility_score is not None:
+        filter_conditions.append(DiscoveredContent.credibility_score >= min_credibility_score)
     
-    if filters.min_freshness_score is not None:
-        filter_conditions.append(DiscoveredContent.freshness_score >= filters.min_freshness_score)
+    if min_freshness_score is not None:
+        filter_conditions.append(DiscoveredContent.freshness_score >= min_freshness_score)
     
-    if filters.published_after:
-        filter_conditions.append(DiscoveredContent.published_at >= filters.published_after)
+    if published_after:
+        filter_conditions.append(DiscoveredContent.published_at >= published_after)
     
-    if filters.published_before:
-        filter_conditions.append(DiscoveredContent.published_at <= filters.published_before)
+    if published_before:
+        filter_conditions.append(DiscoveredContent.published_at <= published_before)
     
-    if filters.competitive_relevance:
-        filter_conditions.append(DiscoveredContent.competitive_relevance.in_(filters.competitive_relevance))
+    if competitive_relevance:
+        filter_conditions.append(DiscoveredContent.competitive_relevance.in_(competitive_relevance))
     
-    if filters.is_delivered is not None:
-        filter_conditions.append(DiscoveredContent.is_delivered == filters.is_delivered)
+    if is_delivered is not None:
+        filter_conditions.append(DiscoveredContent.is_delivered == is_delivered)
     
-    if filters.exclude_duplicates:
+    if exclude_duplicates:
         filter_conditions.append(DiscoveredContent.is_duplicate == False)
     
     if filter_conditions:
@@ -328,7 +338,7 @@ async def get_discovered_content(
     query = query.order_by(desc(DiscoveredContent.overall_score))
     
     # Apply pagination
-    query = query.offset(pagination.offset).limit(pagination.limit)
+    query = query.offset(pagination.offset).limit(pagination.per_page)
     
     # Include source information
     query = query.options(selectinload(DiscoveredContent.source))
@@ -577,8 +587,8 @@ async def track_content_engagement(
 @router.post("/webhooks/sendgrid", status_code=status.HTTP_200_OK)
 async def process_sendgrid_webhook(
     events: List[SendGridEngagementData],
-    x_forwarded_for: Optional[str] = Header(None),
     background_tasks: BackgroundTasks,
+    x_forwarded_for: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db_session)
 ):
     """
@@ -606,28 +616,37 @@ async def process_sendgrid_webhook(
                 # Extract content ID from URL if it's a click event
                 content_id = None
                 if event_data.url and event_data.event in ["click", "open"]:
-                    content_id = await discovery_service._extract_content_id_from_url(event_data.url)
+                    content_id = discovery_service._extract_content_id_from_url(event_data.url)
                 
-                # Create engagement record
+                # Map SendGrid event type to internal format
+                try:
+                    engagement_type = EngagementType(event_data.event.lower())
+                except ValueError:
+                    # Fallback for unknown event types
+                    base_ops.logger.warning(f"Unknown SendGrid event type: {event_data.event}")
+                    continue
+                
+                # Create engagement record with proper error handling
                 engagement = ContentEngagement(
                     user_id=user.id,
                     content_id=content_id,
-                    engagement_type=EngagementType(event_data.event.lower()),
+                    engagement_type=engagement_type,
                     engagement_value=Decimal('1.0'),
-                    sendgrid_event_id=event_data.sg_event_id,
-                    sendgrid_message_id=event_data.sg_message_id,
+                    sendgrid_event_id=getattr(event_data, 'sg_event_id', None),
+                    sendgrid_message_id=getattr(event_data, 'sg_message_id', None),
                     email_subject=getattr(event_data, 'subject', None),
-                    user_agent=event_data.useragent,
-                    ip_address=event_data.ip or x_forwarded_for,
-                    engagement_timestamp=datetime.fromtimestamp(event_data.timestamp),
-                    device_type=discovery_service._extract_device_type(event_data.useragent or ""),
+                    user_agent=getattr(event_data, 'useragent', None),
+                    ip_address=getattr(event_data, 'ip', None) or x_forwarded_for,
+                    engagement_timestamp=datetime.fromtimestamp(getattr(event_data, 'timestamp', time.time())),
+                    device_type=discovery_service._extract_device_type(getattr(event_data, 'useragent', '') or ""),
                     engagement_context=json.dumps({
                         "sendgrid_event": event_data.event,
                         "unique_args": getattr(event_data, 'unique_args', {}),
-                        "category": getattr(event_data, 'category', [])
+                        "category": getattr(event_data, 'category', []),
+                        "url": getattr(event_data, 'url', None)
                     }),
                     feedback_processed=False,
-                    ml_weight=discovery_service.engagement_weights.get(
+                    ml_weight=getattr(discovery_service, 'engagement_weights', {}).get(
                         f"email_{event_data.event}", Decimal('1.0')
                     )
                 )
@@ -732,7 +751,7 @@ async def get_user_engagement_history(
     query = query.order_by(desc(ContentEngagement.created_at))
     
     # Apply pagination
-    query = query.offset(pagination.offset).limit(pagination.limit)
+    query = query.offset(pagination.offset).limit(pagination.per_page)
     
     result = await db.execute(query)
     engagements = result.scalars().all()
@@ -825,7 +844,7 @@ async def get_discovery_jobs(
     query = query.order_by(desc(DiscoveryJob.created_at))
     
     # Apply pagination
-    query = query.offset(pagination.offset).limit(pagination.limit)
+    query = query.offset(pagination.offset).limit(pagination.per_page)
     
     result = await db.execute(query)
     jobs = result.scalars().all()
@@ -1304,9 +1323,9 @@ async def test_source_connection(
 @router.post("/jobs/{job_id}/control")
 async def control_discovery_job(
     job_id: int,
+    background_tasks: BackgroundTasks,
     action: str = Body(..., embed=True, regex=r"^(start|stop|pause|resume|cancel)$"),
     reason: Optional[str] = Body(None, embed=True),
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_active_user)
 ):
