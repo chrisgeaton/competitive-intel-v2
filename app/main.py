@@ -20,6 +20,7 @@ from app.middleware import (
 )
 from app.routers import auth_router, users_router, strategic_profile_router, focus_areas_router, entity_tracking_router, delivery_preferences_router
 from app.routers.discovery import router as discovery_router
+from app.routers.analysis import router as analysis_router
 
 # Configure logging
 logging.basicConfig(
@@ -63,6 +64,7 @@ A comprehensive competitive intelligence platform with ML-driven content discove
 - **User Management**: Complete profile management and preferences
 - **Strategic Profiles**: Business context for personalized intelligence
 - **Discovery Service**: ML-driven content discovery with learning algorithms
+- **Analysis Service**: Multi-stage AI analysis with strategic insights
 - **Engagement Tracking**: SendGrid integration for ML learning
 - **Content Scoring**: AI-powered relevance and credibility assessment
 - **Deduplication**: Advanced content similarity detection
@@ -112,6 +114,7 @@ app.include_router(focus_areas_router)
 app.include_router(entity_tracking_router)
 app.include_router(delivery_preferences_router)
 app.include_router(discovery_router)
+app.include_router(analysis_router)
 
 
 @app.get("/")
