@@ -19,6 +19,7 @@ from app.middleware import (
     AuthenticationMiddleware
 )
 from app.routers import auth_router, users_router, strategic_profile_router, focus_areas_router, entity_tracking_router, delivery_preferences_router
+from app.routers.discovery import router as discovery_router
 
 # Configure logging
 logging.basicConfig(
@@ -53,14 +54,18 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="""
-## Competitive Intelligence v2 - User Config Service
+## Competitive Intelligence v2 - Complete Platform
 
-A comprehensive user management and authentication API for competitive intelligence platform.
+A comprehensive competitive intelligence platform with ML-driven content discovery, user management, and personalized intelligence delivery.
 
 ### Features
 - **Secure Authentication**: JWT-based authentication with refresh tokens
 - **User Management**: Complete profile management and preferences
 - **Strategic Profiles**: Business context for personalized intelligence
+- **Discovery Service**: ML-driven content discovery with learning algorithms
+- **Engagement Tracking**: SendGrid integration for ML learning
+- **Content Scoring**: AI-powered relevance and credibility assessment
+- **Deduplication**: Advanced content similarity detection
 - **Session Management**: Multi-device session handling
 - **Security**: Enterprise-grade security with rate limiting and validation
 
@@ -106,6 +111,7 @@ app.include_router(strategic_profile_router)
 app.include_router(focus_areas_router)
 app.include_router(entity_tracking_router)
 app.include_router(delivery_preferences_router)
+app.include_router(discovery_router)
 
 
 @app.get("/")
