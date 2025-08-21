@@ -645,7 +645,7 @@ class PodcastDiscoveryEngine(BaseDiscoveryEngine):
             item.quality_score = quality_score
             
             # Only include items above minimum thresholds
-            if relevance_score > 0.3 and quality_score > 0.4:
+            if relevance_score > 0.2 and quality_score > 0.3:
                 filtered_items.append(item)
         
         return filtered_items
