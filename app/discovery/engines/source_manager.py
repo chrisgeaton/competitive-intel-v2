@@ -14,6 +14,7 @@ from .base_engine import BaseDiscoveryEngine, DiscoveredItem, SourceMetrics
 from .news_api_client import NewsAPIClient
 from .rss_monitor import RSSMonitor
 from .web_scraper import WebScraper
+from .podcast_engine import PodcastDiscoveryEngine
 
 
 class EngineStatus(str, Enum):
@@ -338,11 +339,40 @@ class SourceManager(BaseDiscoveryEngine):
             )
             self.engine_configs['web_scraper'] = scraper_config
         
+        # Podcast Discovery Engine
+        if config.get('podcast_index', {}).get('enabled', True):
+            podcast_config = EngineConfig(
+                name="podcast_index",
+                engine_class=PodcastDiscoveryEngine,
+                config=config.get('podcast_index', {}),
+                priority=7,
+                weight=1.1
+            )
+            self.engine_configs['podcast_index'] = podcast_config
+        
         # Initialize engine instances
         for engine_name, engine_config in self.engine_configs.items():
             try:
                 if engine_config.is_enabled:
-                    engine_instance = engine_config.engine_class(engine_config.config)
+                    # Handle different constructor signatures
+                    if engine_name == 'podcast_index':
+                        # Podcast engine requires api_key and api_secret as separate parameters
+                        api_key = engine_config.config.get('api_key')
+                        api_secret = engine_config.config.get('api_secret')
+                        if api_key and api_secret:
+                            # Remove keys from config to avoid passing them twice
+                            config_copy = engine_config.config.copy()
+                            config_copy.pop('api_key', None)
+                            config_copy.pop('api_secret', None)
+                            engine_instance = engine_config.engine_class(api_key, api_secret, config_copy)
+                        else:
+                            self.logger.warning(f"Podcast engine missing required API credentials, skipping")
+                            self.engine_statuses[engine_name] = EngineStatus.INACTIVE
+                            continue
+                    else:
+                        # Standard constructor with config dict
+                        engine_instance = engine_config.engine_class(engine_config.config)
+                    
                     self.engines[engine_name] = engine_instance
                     self.engine_statuses[engine_name] = EngineStatus.ACTIVE
                     self.logger.info(f"Initialized engine: {engine_name}")

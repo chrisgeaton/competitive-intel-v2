@@ -28,6 +28,7 @@ class ContentType(str, Enum):
     SOCIAL = "social"
     PRESS_RELEASE = "press_release"
     FORUM = "forum"
+    PODCAST = "podcast"
     OTHER = "other"
 
 
@@ -37,6 +38,7 @@ class SourceType(str, Enum):
     RSS_FEED = "rss_feed"
     WEB_SCRAPER = "web_scraper"
     SOCIAL_API = "social_api"
+    PODCAST = "podcast"
     OTHER = "other"
 
 
