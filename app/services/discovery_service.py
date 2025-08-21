@@ -33,6 +33,13 @@ from app.models.delivery import UserDeliveryPreferences
 from app.utils.router_base import BaseRouterOperations
 from app.utils.exceptions import errors
 
+# Import shared discovery utilities
+from app.discovery.utils import (
+    ContentUtils, get_user_context_cache, get_content_processing_cache,
+    get_ml_scoring_cache, DiscoveryConfig, get_config,
+    AsyncBatchProcessor, batch_processor
+)
+
 
 @dataclass
 class UserContext:
@@ -81,18 +88,38 @@ class DiscoveryService(BaseRouterOperations):
     
     def __init__(self):
         super().__init__("discovery_service")
-        self.ml_model_version = "2.0"
-        self.similarity_threshold = 0.85
-        self.relevance_threshold = 0.7
+        
+        # Use centralized configuration
+        self.config = get_config()
+        
+        # ML Configuration from centralized config
+        self.ml_model_version = self.config.ml.model_version
+        self.similarity_threshold = self.config.ml.similarity_threshold
+        self.relevance_threshold = self.config.ml.relevance_threshold
+        
+        # Enhanced engagement weights from config
         self.engagement_weights = {
-            'email_open': 1.0,
-            'email_click': 3.0,
-            'time_spent': 0.1,  # per second
+            'email_open': self.config.ml.email_open_weight,
+            'email_click': self.config.ml.email_click_weight,
+            'time_spent': self.config.ml.time_spent_weight,
+            'manual_feedback': self.config.ml.manual_feedback_weight,
             'bookmark': 5.0,
             'share': 7.0,
             'feedback_positive': 10.0,
             'feedback_negative': -5.0
         }
+        
+        # Use shared utilities
+        self.batch_processor = AsyncBatchProcessor(
+            batch_size=self.config.performance.batch_size,
+            max_concurrent=self.config.performance.max_concurrent_engines,
+            timeout=self.config.performance.default_timeout
+        )
+        
+        # Get caches
+        self.user_context_cache = get_user_context_cache()
+        self.content_processing_cache = get_content_processing_cache()
+        self.ml_scoring_cache = get_ml_scoring_cache()
     
     async def get_user_context(self, db: AsyncSession, user_id: int) -> UserContext:
         """
@@ -101,6 +128,12 @@ class DiscoveryService(BaseRouterOperations):
         Combines strategic profile, focus areas, tracked entities, and
         historical engagement data for personalized content discovery.
         """
+        # Check cache first
+        cache_key = f"user_context_{user_id}"
+        cached_context = self.user_context_cache.get(cache_key)
+        if cached_context:
+            return cached_context
+        
         # Get strategic profile
         strategic_profile_result = await db.execute(
             select(UserStrategicProfile).where(UserStrategicProfile.user_id == user_id)
@@ -129,7 +162,7 @@ class DiscoveryService(BaseRouterOperations):
         engagement_history = await self._calculate_engagement_history(db, user_id)
         ml_preferences = await self._calculate_ml_preferences(db, user_id)
         
-        return UserContext(
+        user_context = UserContext(
             user_id=user_id,
             strategic_profile=strategic_profile.__dict__ if strategic_profile else None,
             focus_areas=[fa.__dict__ for fa in focus_areas],
@@ -138,6 +171,10 @@ class DiscoveryService(BaseRouterOperations):
             engagement_history=engagement_history,
             ml_preferences=ml_preferences
         )
+        
+        # Cache the user context
+        self.user_context_cache.put(cache_key, user_context)
+        return user_context
     
     async def _calculate_engagement_history(self, db: AsyncSession, user_id: int) -> Dict[str, float]:
         """Calculate user engagement history for ML training."""
@@ -870,21 +907,8 @@ class DiscoveryService(BaseRouterOperations):
         return min(matches / len(keywords), 1.0)
     
     def _calculate_text_similarity(self, text1: str, text2: str) -> float:
-        """Calculate text similarity using simple algorithms."""
-        if not text1 or not text2:
-            return 0.0
-        
-        # Simple word overlap similarity
-        words1 = set(re.findall(r'\w+', text1.lower()))
-        words2 = set(re.findall(r'\w+', text2.lower()))
-        
-        if not words1 or not words2:
-            return 0.0
-        
-        intersection = len(words1.intersection(words2))
-        union = len(words1.union(words2))
-        
-        return intersection / union if union > 0 else 0.0
+        """Calculate text similarity using ContentUtils."""
+        return ContentUtils.calculate_text_similarity(text1, text2)
     
     def _assess_author_credibility(self, author: str) -> float:
         """Simple author credibility assessment."""
@@ -902,33 +926,13 @@ class DiscoveryService(BaseRouterOperations):
         return min(credibility, 1.0)
     
     def _assess_content_quality(self, content_text: str) -> float:
-        """Assess content quality based on text analysis."""
-        if not content_text:
-            return 0.5
-        
-        quality = 0.5
-        
-        # Length quality (not too short, not too long)
-        length = len(content_text)
-        if 500 <= length <= 5000:
-            quality += 0.2
-        elif 200 <= length <= 10000:
-            quality += 0.1
-        
-        # Sentence structure quality
-        sentences = content_text.split('.')
-        avg_sentence_length = sum(len(s.split()) for s in sentences) / len(sentences) if sentences else 0
-        if 10 <= avg_sentence_length <= 30:
-            quality += 0.1
-        
-        # Grammar indicators (simple heuristics)
-        if content_text.count('!') / length < 0.01:  # Not too many exclamations
-            quality += 0.1
-        
-        if content_text.count('?') / length < 0.005:  # Reasonable number of questions
-            quality += 0.1
-        
-        return min(quality, 1.0)
+        """Assess content quality using ContentUtils."""
+        return ContentUtils.assess_content_quality(
+            content_text or "",
+            "",  # No title available in this context
+            self.config.content.min_content_length,
+            self.config.content.max_content_length
+        )
     
     def _assess_url_credibility(self, url: str) -> float:
         """Assess URL credibility based on domain and structure."""
@@ -965,28 +969,28 @@ class DiscoveryService(BaseRouterOperations):
             return 0.5
     
     def _calculate_url_similarity(self, url1: str, url2: str) -> float:
-        """Calculate URL similarity for deduplication."""
+        """Calculate URL similarity using ContentUtils normalization."""
         if not url1 or not url2:
             return 0.0
         
         try:
-            parsed1 = urlparse(url1)
-            parsed2 = urlparse(url2)
+            # Normalize URLs for comparison
+            normalized1 = ContentUtils.normalize_url(url1)
+            normalized2 = ContentUtils.normalize_url(url2)
             
-            # Exact match
-            if url1 == url2:
+            # Exact match after normalization
+            if normalized1 == normalized2:
                 return 1.0
             
-            # Domain similarity
+            # Domain and path similarity
+            parsed1 = urlparse(normalized1)
+            parsed2 = urlparse(normalized2)
+            
             domain_similarity = 1.0 if parsed1.netloc == parsed2.netloc else 0.0
+            path_similarity = ContentUtils.calculate_text_similarity(parsed1.path, parsed2.path)
             
-            # Path similarity
-            path_similarity = self._calculate_text_similarity(parsed1.path, parsed2.path)
+            return domain_similarity * 0.6 + path_similarity * 0.4
             
-            # Overall URL similarity
-            similarity = domain_similarity * 0.6 + path_similarity * 0.4
-            
-            return similarity
         except Exception:
             return 0.0
     
@@ -1057,15 +1061,5 @@ class DiscoveryService(BaseRouterOperations):
         return hashlib.sha256(normalized.encode()).hexdigest()
     
     async def generate_similarity_hash(self, content: str) -> str:
-        """Generate similarity hash for near-duplicate detection."""
-        if not content:
-            return ''
-        
-        # Use first 500 characters for similarity hashing
-        content_sample = content[:500].lower()
-        # Remove common words and punctuation
-        content_sample = re.sub(r'\b(the|and|or|but|in|on|at|to|for|of|with|by)\b', '', content_sample)
-        content_sample = re.sub(r'[^\w\s]', '', content_sample)
-        content_sample = re.sub(r'\s+', ' ', content_sample).strip()
-        
-        return hashlib.md5(content_sample.encode()).hexdigest()
+        """Generate similarity hash using ContentUtils."""
+        return ContentUtils.generate_content_hash(content)
