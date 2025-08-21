@@ -1,0 +1,183 @@
+{
+  "total_tests": 24,
+  "passed": 23,
+  "failed": 1,
+  "errors": [],
+  "test_categories": {
+    "Core Service Tests": {
+      "tests": [
+        {
+          "name": "Service initialization",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Filter score calculation",
+          "passed": false,
+          "error": ""
+        },
+        {
+          "name": "Cost optimization",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "passed": 2,
+      "failed": 1
+    },
+    "Stage 1 Filtering Tests": {
+      "tests": [
+        {
+          "name": "Keyword filter",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Entity filter",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Relevance filter",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Composite filter",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Filter factory",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "passed": 5,
+      "failed": 0
+    },
+    "Pipeline Tests": {
+      "tests": [
+        {
+          "name": "Pipeline initialization",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Stage processing",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Batch processing",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Cost estimation",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "passed": 4,
+      "failed": 0
+    },
+    "Cost Optimization Tests": {
+      "tests": [
+        {
+          "name": "Cost estimation accuracy",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Model selection logic",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "70% cost savings target",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "passed": 3,
+      "failed": 0
+    },
+    "Integration Tests": {
+      "tests": [
+        {
+          "name": "User context integration",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Discovery Service integration",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Batch creation",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "passed": 3,
+      "failed": 0
+    },
+    "Performance Tests": {
+      "tests": [
+        {
+          "name": "Filtering speed (<1s for 100 items)",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Memory usage optimization",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Concurrent processing",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "passed": 3,
+      "failed": 0
+    },
+    "Error Handling Tests": {
+      "tests": [
+        {
+          "name": "Empty content handling",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Missing fields handling",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Invalid data types",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "performance_metrics": {
+    "filtering_speed": {
+      "items": 100,
+      "time_seconds": 0.0060770511627197266,
+      "items_per_second": 16455.349366393348
+    },
+    "memory_usage": {
+      "contexts_cached": 50,
+      "cache_size_bytes": 2264
+    }
+  },
+  "timestamp": "2025-08-21T17:21:20.239340",
+  "success_rate": 95.83333333333334
+}
