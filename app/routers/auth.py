@@ -2,19 +2,18 @@
 Authentication routes for the Competitive Intelligence v2 API.
 """
 
-import logging
-from fastapi import APIRouter, Depends, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Request
 
-from app.database import get_db_session
 from app.auth import auth_service
 from app.models.user import User, UserSession
 from app.schemas.auth import UserRegister, UserLogin, Token, UserResponse
-from app.middleware import get_current_user
-from app.utils.exceptions import errors, db_handler
-from app.utils.database import db_helpers
+from app.middleware import get_current_user, get_current_active_user
+from app.utils.router_base import (
+    logging, APIRouter, Depends, status, AsyncSession, select,
+    get_db_session, errors, db_handler, db_helpers, BaseRouterOperations
+)
 
-logger = logging.getLogger(__name__)
+base_ops = BaseRouterOperations(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -196,3 +195,64 @@ async def refresh_token(
     return await db_handler.handle_db_operation(
         "refresh token", _refresh_operation, db, rollback_on_error=False
     )
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(
+    request: Request,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Get current authenticated user information.
+    
+    Validates JWT token and returns current user profile information.
+    This endpoint requires a valid JWT token in the Authorization header.
+    
+    **Authentication Required**: Bearer token in Authorization header
+    
+    Returns the current user's profile including:
+    - **id**: User's unique identifier
+    - **email**: User's email address
+    - **name**: User's full name
+    - **is_active**: Account activation status
+    - **subscription_status**: Current subscription level
+    - **created_at**: Account creation timestamp
+    - **last_login**: Last login timestamp (if available)
+    """
+    # Manually extract and validate token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise errors.unauthorized("Missing or invalid authorization header")
+    
+    token = auth_header.split(" ")[1]
+    token_data = auth_service.decode_token(token)
+    
+    if not token_data:
+        raise errors.unauthorized("Invalid or expired token")
+    
+    # Get user from database
+    from sqlalchemy import select
+    result = await db.execute(
+        select(User).where(User.id == token_data.user_id)
+    )
+    current_user = result.scalar_one_or_none()
+    
+    if not current_user:
+        raise errors.unauthorized("User not found")
+    
+    if not current_user.is_active:
+        raise errors.bad_request("Inactive user")
+    
+    logger.info(f"User info requested for: {current_user.email}")
+    
+    # Return user information using UserResponse schema
+    # Manual dict construction to ensure ASCII-only output and avoid validation issues
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "is_active": current_user.is_active,
+        "subscription_status": current_user.subscription_status,
+        "created_at": current_user.created_at,
+        "last_login": current_user.last_login
+    }

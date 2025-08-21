@@ -2,16 +2,9 @@
 User management routes for the Competitive Intelligence v2 API.
 """
 
-import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
-from app.database import get_db_session
 from app.auth import auth_service
-from app.models.user import User
 from app.models.strategic_profile import UserStrategicProfile
 from app.schemas.auth import UserResponse, PasswordChange
 from app.schemas.user import (
@@ -19,11 +12,13 @@ from app.schemas.user import (
     StrategicProfileCreate, StrategicProfileUpdate, StrategicProfileResponse,
     FocusAreaResponse, DeliveryPreferencesResponse
 )
-from app.middleware import get_current_active_user
-from app.utils.exceptions import errors, db_handler, validators
-from app.utils.database import db_helpers
+from app.utils.router_base import (
+    logging, Dict, List, Any, APIRouter, Depends, status,
+    AsyncSession, select, selectinload, get_db_session, User, get_current_active_user,
+    errors, db_handler, db_helpers, validators, BaseRouterOperations
+)
 
-logger = logging.getLogger(__name__)
+base_ops = BaseRouterOperations(__name__)
 
 router = APIRouter(prefix="/api/v1/users", tags=["User Management"])
 

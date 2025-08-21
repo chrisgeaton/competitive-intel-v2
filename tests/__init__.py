@@ -1,0 +1,1 @@
+"""Test package for Competitive Intelligence v2 API."""

@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-08-20T21:48:09.746676",
+  "total_duration_ms": 1041.3,
+  "fixes_tested": 3,
+  "fixes_passed": 0,
+  "fixes_failed": 3,
+  "test_results": [
+    {
+      "name": "delivery_preferences_fix",
+      "status": "FAIL",
+      "error": "Authentication failed"
+    },
+    {
+      "name": "auth_me_endpoint_fix",
+      "status": "FAIL",
+      "error": "Authentication failed"
+    },
+    {
+      "name": "entity_tracking_auth_fix",
+      "status": "FAIL",
+      "error": "Authentication failed"
+    }
+  ]
+}

@@ -166,22 +166,37 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/auth/register",
         "/auth/login",
         "/auth/reset-password",
-        "/auth/confirm-reset"
+        "/auth/confirm-reset",
+        "/api/v1/strategic-profile/enums/industries",
+        "/api/v1/strategic-profile/enums/organization-types",
+        "/api/v1/strategic-profile/enums/roles",
+        "/api/v1/strategic-profile/enums/strategic-goals",
+        "/api/v1/strategic-profile/enums/organization-sizes"
     }
     
     # Routes that require authentication
     PROTECTED_PREFIXES = [
         "/api/v1/users",
         "/api/v1/profile",
+        "/api/v1/strategic-profile",
         "/api/v1/focus-areas",
         "/api/v1/entities",
         "/api/v1/preferences"
     ]
     
+    # Specific protected auth routes  
+    PROTECTED_AUTH_ROUTES = {
+        "/api/v1/auth/logout"
+    }
+    
     def _is_protected_route(self, path: str) -> bool:
         """Check if route requires authentication."""
         if path in self.PUBLIC_ROUTES:
             return False
+        
+        # Check specific protected auth routes
+        if path in self.PROTECTED_AUTH_ROUTES:
+            return True
         
         for prefix in self.PROTECTED_PREFIXES:
             if path.startswith(prefix):

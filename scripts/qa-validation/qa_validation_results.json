@@ -1,0 +1,166 @@
+{
+  "timestamp": "2025-08-20T22:06:57.068881",
+  "total_duration_ms": 10693.582534790039,
+  "modules": [
+    {
+      "module": "authentication",
+      "tests": [
+        {
+          "name": "user_registration",
+          "status": "PASS",
+          "duration_ms": 1164.818286895752,
+          "details": "User registered with ID 77"
+        },
+        {
+          "name": "user_login",
+          "status": "PASS",
+          "duration_ms": 912.3995304107666,
+          "details": "Login successful, token obtained"
+        },
+        {
+          "name": "token_validation",
+          "status": "PASS",
+          "duration_ms": 427.26731300354004,
+          "details": "Token validation successful"
+        },
+        {
+          "name": "unauthorized_protection",
+          "status": "PASS",
+          "duration_ms": 240.12231826782227,
+          "details": "Properly blocks unauthorized access"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "module": "user_management",
+      "tests": [
+        {
+          "name": "get_profile",
+          "status": "PASS",
+          "duration_ms": 454.48756217956543,
+          "details": "Profile retrieved for user ID 77"
+        },
+        {
+          "name": "update_profile",
+          "status": "PASS",
+          "duration_ms": 618.9188957214355,
+          "details": "Profile update successful"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "module": "strategic_profile",
+      "tests": [
+        {
+          "name": "industries_enum",
+          "status": "PASS",
+          "duration_ms": 251.00326538085938,
+          "details": "Retrieved 30 industries"
+        },
+        {
+          "name": "create_strategic_profile",
+          "status": "PASS",
+          "duration_ms": 702.9922008514404,
+          "details": "Strategic profile created successfully"
+        },
+        {
+          "name": "strategic_analytics",
+          "status": "PASS",
+          "duration_ms": 468.31297874450684,
+          "details": "Analytics retrieved, completeness: 100.0%"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "module": "focus_areas",
+      "tests": [
+        {
+          "name": "create_focus_area",
+          "status": "PASS",
+          "duration_ms": 491.2233352661133,
+          "details": "Focus area created with ID 9"
+        },
+        {
+          "name": "list_focus_areas",
+          "status": "PASS",
+          "duration_ms": 541.7051315307617,
+          "details": "Retrieved 1 focus areas"
+        },
+        {
+          "name": "focus_areas_analytics",
+          "status": "PASS",
+          "duration_ms": 543.7672138214111,
+          "details": "Analytics: 1 areas, 20.0% coverage"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "module": "entity_tracking",
+      "tests": [
+        {
+          "name": "create_tracking_entity",
+          "status": "PASS",
+          "duration_ms": 577.1453380584717,
+          "details": "Entity created with ID 11"
+        },
+        {
+          "name": "start_entity_tracking",
+          "status": "PASS",
+          "duration_ms": 674.3855476379395,
+          "details": "Entity tracking activated successfully"
+        },
+        {
+          "name": "list_available_entities",
+          "status": "PASS",
+          "duration_ms": 534.1470241546631,
+          "details": "Retrieved 11 available entities"
+        },
+        {
+          "name": "entity_tracking_analytics",
+          "status": "PASS",
+          "duration_ms": 575.9825706481934,
+          "details": "Analytics: 1 tracked, 1 enabled"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "module": "delivery_preferences",
+      "tests": [
+        {
+          "name": "delivery_defaults",
+          "status": "PASS",
+          "duration_ms": 480.0295829772949,
+          "details": "Defaults retrieved, recommended frequency: daily"
+        },
+        {
+          "name": "configure_delivery_preferences",
+          "status": "PASS",
+          "duration_ms": 570.8427429199219,
+          "details": "Delivery preferences configured successfully"
+        },
+        {
+          "name": "delivery_analytics",
+          "status": "PASS",
+          "duration_ms": 462.5723361968994,
+          "details": "Analytics retrieved, schedule: Daily at 09:00 AM America/New_York (weekdays only)"
+        }
+      ],
+      "status": "PASS"
+    }
+  ],
+  "summary": {
+    "total_modules": 6,
+    "modules_passed": 6,
+    "modules_failed": 0,
+    "modules_skipped": 0,
+    "total_tests": 19,
+    "tests_passed": 19,
+    "tests_failed": 0,
+    "tests_skipped": 0
+  }
+}

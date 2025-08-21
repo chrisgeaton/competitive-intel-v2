@@ -116,3 +116,6 @@ async def init_db():
 async def close_db():
     """Close database connections on application shutdown."""
     await db_manager.close()
+
+# Import models to register them with SQLAlchemy
+from app.models import user, strategic_profile, tracking, delivery  # noqa: E402

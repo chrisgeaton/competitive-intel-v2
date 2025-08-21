@@ -18,7 +18,7 @@ from app.middleware import (
     RateLimitMiddleware, 
     AuthenticationMiddleware
 )
-from app.routers import auth_router, users_router
+from app.routers import auth_router, users_router, strategic_profile_router, focus_areas_router, entity_tracking_router, delivery_preferences_router
 
 # Configure logging
 logging.basicConfig(
@@ -102,6 +102,10 @@ app.add_middleware(AuthenticationMiddleware)
 # Include routers
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(strategic_profile_router)
+app.include_router(focus_areas_router)
+app.include_router(entity_tracking_router)
+app.include_router(delivery_preferences_router)
 
 
 @app.get("/")
