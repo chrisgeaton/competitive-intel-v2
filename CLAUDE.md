@@ -44,6 +44,14 @@
    - Error: `non-body parameters must be in path, query, header or cookie: regenerate`
    - Location: `app\routers\reports.py:254` in `/email/send` endpoint
    
+### 🚨 CRITICAL: Git Safety & File Management
+
+**NEVER USE `git restore` WITHOUT EXPLICIT USER PERMISSION**
+- **Issue**: `git restore` reverts files to last committed state, destroying uncommitted changes
+- **Risk**: Can permanently delete API keys, configuration, and other uncommitted work
+- **Rule**: Always check with user before any git restore operations
+- **Alternative**: Use `git status` and `git diff` to show changes before any destructive operations
+
 ### 🚨 CRITICAL: Stale Process Management
 
 **Problem**: Stale Python processes on port 8000 can cause misleading debugging results

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from app.database import get_db_session
-from app.auth.dependencies import get_current_user
+from app.middleware import get_current_user
 from app.models.user import User
 from app.services.orchestration_service import (
     OrchestrationService, PipelineExecution, PipelineStatus, PipelineStage
@@ -23,9 +23,9 @@ from app.utils.router_base import BaseRouterOperations
 # Pydantic models for API requests/responses
 class PipelineExecutionRequest(BaseModel):
     """Request to execute pipeline for user."""
-    trigger_type: str = Field(default="manual", regex="^(manual|scheduled|webhook)$")
+    trigger_type: str = Field(default="manual", pattern="^(manual|scheduled|webhook)$")
     discovery_enabled: bool = Field(default=True)
-    analysis_depth: str = Field(default="standard", regex="^(quick|standard|deep)$")
+    analysis_depth: str = Field(default="standard", pattern="^(quick|standard|deep)$")
     email_delivery: bool = Field(default=True)
     custom_config: Optional[Dict[str, Any]] = None
 
@@ -46,7 +46,7 @@ class PipelineExecutionResponse(BaseModel):
 class BatchPipelineRequest(BaseModel):
     """Request for batch pipeline execution."""
     user_ids: List[int] = Field(..., min_items=1, max_items=100)
-    trigger_type: str = Field(default="manual", regex="^(manual|scheduled|webhook)$")
+    trigger_type: str = Field(default="manual", pattern="^(manual|scheduled|webhook)$")
 
 
 class BatchPipelineResponse(BaseModel):
@@ -61,7 +61,7 @@ class BatchPipelineResponse(BaseModel):
 class SchedulePipelineRequest(BaseModel):
     """Request to schedule pipeline execution."""
     schedule_time: datetime
-    recurrence: Optional[str] = Field(None, regex="^(daily|weekly|monthly)$")
+    recurrence: Optional[str] = Field(None, pattern="^(daily|weekly|monthly)$")
     pipeline_config: Optional[PipelineExecutionRequest] = None
 
 

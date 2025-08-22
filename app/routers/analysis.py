@@ -23,7 +23,7 @@ from app.models.analysis import AnalysisResult, StrategicInsight, AnalysisJob
 from app.models.user import User
 from app.models.discovery import DiscoveredContent
 from app.analysis.core import AnalysisStage, ContentPriority, AnalysisContext
-from app.auth_deps.dependencies import get_current_user
+from app.middleware import get_current_user
 from app.utils.exceptions import errors
 
 

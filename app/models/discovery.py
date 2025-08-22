@@ -127,6 +127,8 @@ class DiscoveredContent(Base):
     
     # Relationships
     source = relationship("DiscoveredSource", back_populates="discovered_content")
+    analysis_results = relationship("AnalysisResult", back_populates="content")
+    strategic_insights = relationship("StrategicInsight", back_populates="content", cascade="all, delete-orphan")
     engagements = relationship("ContentEngagement", back_populates="content", cascade="all, delete-orphan")
     duplicate_parent = relationship("DiscoveredContent", remote_side=[id], backref="duplicates")
     

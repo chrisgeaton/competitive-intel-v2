@@ -9,7 +9,9 @@ Following established User Config Service patterns with BaseRouterOperations.
 import json
 import asyncio
 import time
-from datetime import datetime, timedelta
+import aiohttp
+import feedparser
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional, Dict, Any, Union
 
@@ -98,10 +100,10 @@ async def create_discovery_source(
         raise errors.conflict("Source URL already exists")
     
     # Create source
-    source = DiscoveredSource(
-        **source_data.dict(),
-        created_by_user_id=current_user.id
-    )
+    source_dict = source_data.dict()
+    source_dict['created_by_user_id'] = current_user.id
+    
+    source = DiscoveredSource(**source_dict)
     
     db.add(source)
     await db.commit()
@@ -149,7 +151,7 @@ async def get_discovery_sources(
     
     # Apply pagination
     query = query.order_by(desc(DiscoveredSource.quality_score))
-    query = query.offset(pagination.offset).limit(pagination.limit)
+    query = query.offset(pagination.offset).limit(pagination.per_page)
     
     result = await db.execute(query)
     sources = result.scalars().all()
@@ -788,11 +790,11 @@ async def create_discovery_job(
     Use GET /jobs/{job_id} to monitor progress and results.
     """
     # Create job
-    job = DiscoveryJob(
-        **job_data.dict(),
-        user_id=job_data.user_id or current_user.id,
-        created_by="user"
-    )
+    job_dict = job_data.dict()
+    job_dict['user_id'] = job_data.user_id or current_user.id
+    job_dict['created_by'] = "user"
+    
+    job = DiscoveryJob(**job_dict)
     
     db.add(job)
     await db.commit()
@@ -1033,7 +1035,7 @@ async def get_ml_model_metrics(
 
 @router.get("/analytics/dashboard", response_model=Dict[str, Any])
 async def get_discovery_dashboard(
-    time_period: str = Query("7d", regex=r"^(1d|7d|30d|90d)$", description="Time period for analytics"),
+    time_period: str = Query("7d", pattern=r"^(1d|7d|30d|90d)$", description="Time period for analytics"),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -1151,7 +1153,7 @@ async def get_discovery_dashboard(
 @router.get("/sources/{source_id}/health", response_model=Dict[str, Any])
 async def get_source_health_details(
     source_id: int,
-    time_period: str = Query("7d", regex=r"^(1d|7d|30d)$", description="Time period for health analysis"),
+    time_period: str = Query("7d", pattern=r"^(1d|7d|30d)$", description="Time period for health analysis"),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -1324,7 +1326,7 @@ async def test_source_connection(
 async def control_discovery_job(
     job_id: int,
     background_tasks: BackgroundTasks,
-    action: str = Body(..., embed=True, regex=r"^(start|stop|pause|resume|cancel)$"),
+    action: str = Body(..., embed=True, pattern=r"^(start|stop|pause|resume|cancel)$"),
     reason: Optional[str] = Body(None, embed=True),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_active_user)
@@ -1395,37 +1397,278 @@ async def run_discovery_job(job_id: int, db: AsyncSession):
     - Duplicate detection and deduplication
     - User personalization and filtering
     """
-    # This would contain the actual discovery logic
-    # For now, we'll just update the job status
+    import aiohttp
+    import feedparser
+    from urllib.parse import urlparse
     
-    await asyncio.sleep(1)  # Simulate processing
-    
-    await db.execute(
-        update(DiscoveryJob)
-        .where(DiscoveryJob.id == job_id)
-        .values(
-            status="running",
-            started_at=datetime.utcnow(),
-            progress_percentage=50
+    try:
+        # Get the job details
+        job_result = await db.execute(select(DiscoveryJob).where(DiscoveryJob.id == job_id))
+        job = job_result.scalar_one_or_none()
+        
+        if not job:
+            return
+        
+        # Update to running status
+        await db.execute(
+            update(DiscoveryJob)
+            .where(DiscoveryJob.id == job_id)
+            .values(
+                status="running",
+                started_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                progress_percentage=10
+            )
         )
-    )
-    await db.commit()
-    
-    await asyncio.sleep(2)  # Simulate more processing
-    
-    await db.execute(
-        update(DiscoveryJob)
-        .where(DiscoveryJob.id == job_id)
-        .values(
-            status="completed",
-            completed_at=datetime.utcnow(),
-            progress_percentage=100,
-            sources_checked=5,
-            content_found=25,
-            content_processed=25
+        await db.commit()
+        
+        # Get active sources
+        sources_result = await db.execute(
+            select(DiscoveredSource).where(DiscoveredSource.is_active == True)
         )
-    )
-    await db.commit()
+        sources = sources_result.scalars().all()
+        
+        if not sources:
+            await db.execute(
+                update(DiscoveryJob)
+                .where(DiscoveryJob.id == job_id)
+                .values(
+                    status="failed",
+                    error_message="No active discovery sources available",
+                    completed_at=datetime.now(timezone.utc).replace(tzinfo=None)
+                )
+            )
+            await db.commit()
+            return
+        
+        # Progress tracking
+        sources_checked = 0
+        sources_successful = 0
+        sources_failed = 0
+        total_content_found = 0
+        created_content = []
+        
+        # Update progress
+        await db.execute(
+            update(DiscoveryJob)
+            .where(DiscoveryJob.id == job_id)
+            .values(progress_percentage=25)
+        )
+        await db.commit()
+        
+        # Process each source
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30),
+            headers={'User-Agent': 'CompetitiveIntelligenceBot/1.0'}
+        ) as session:
+            
+            for source in sources:
+                sources_checked += 1
+                
+                try:
+                    print(f"Processing source: {source.source_name} ({source.source_url})")
+                    
+                    if source.source_type == 'rss_feeds':
+                        content_items = await _fetch_rss_content(session, source, job.user_id, db)
+                    elif source.source_type == 'news_apis':
+                        content_items = await _fetch_newsapi_content(session, source, job.user_id, db)
+                    else:
+                        print(f"Source type '{source.source_type}' not yet implemented")
+                        content_items = []
+                    
+                    if content_items:
+                        sources_successful += 1
+                        total_content_found += len(content_items)
+                        created_content.extend(content_items)
+                        
+                        # Update source success metrics
+                        await db.execute(
+                            update(DiscoveredSource)
+                            .where(DiscoveredSource.id == source.id)
+                            .values(
+                                last_successful_check=datetime.now(timezone.utc).replace(tzinfo=None),
+                                total_content_found=DiscoveredSource.total_content_found + len(content_items)
+                            )
+                        )
+                    else:
+                        sources_failed += 1
+                        
+                    # Update source last_checked
+                    await db.execute(
+                        update(DiscoveredSource)
+                        .where(DiscoveredSource.id == source.id)
+                        .values(last_checked=datetime.now(timezone.utc).replace(tzinfo=None))
+                    )
+                    
+                except Exception as e:
+                    print(f"Error processing source {source.source_name}: {e}")
+                    sources_failed += 1
+                    continue
+                
+                # Update progress
+                progress = 25 + (sources_checked / len(sources)) * 60
+                await db.execute(
+                    update(DiscoveryJob)
+                    .where(DiscoveryJob.id == job_id)
+                    .values(progress_percentage=int(progress))
+                )
+                await db.commit()
+        
+        # Final commit of all content
+        await db.commit()
+        
+        # Update job to completed
+        await db.execute(
+            update(DiscoveryJob)
+            .where(DiscoveryJob.id == job_id)
+            .values(
+                status="completed",
+                completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                progress_percentage=100,
+                sources_checked=sources_checked,
+                sources_successful=sources_successful,
+                sources_failed=sources_failed,
+                content_found=total_content_found,
+                content_processed=total_content_found
+            )
+        )
+        await db.commit()
+        
+        print(f"Discovery job {job_id} completed: {total_content_found} items from {sources_successful}/{sources_checked} sources")
+        
+    except Exception as e:
+        print(f"Discovery job {job_id} failed: {e}")
+        await db.execute(
+            update(DiscoveryJob)
+            .where(DiscoveryJob.id == job_id)
+            .values(
+                status="failed",
+                error_message=str(e),
+                completed_at=datetime.now(timezone.utc)
+            )
+        )
+        await db.commit()
+
+
+async def _fetch_rss_content(session: aiohttp.ClientSession, source: DiscoveredSource, user_id: int, db: AsyncSession):
+    """Fetch content from RSS feeds."""
+    try:
+        async with session.get(source.source_url) as response:
+            if response.status == 200:
+                rss_content = await response.text()
+                feed = feedparser.parse(rss_content)
+                
+                content_items = []
+                
+                for entry in feed.entries[:10]:  # Limit to 10 most recent items
+                    # Check if we already have this content
+                    existing = await db.execute(
+                        select(DiscoveredContent).where(
+                            and_(
+                                DiscoveredContent.content_url == entry.link,
+                                DiscoveredContent.user_id == user_id
+                            )
+                        )
+                    )
+                    
+                    if existing.scalar_one_or_none():
+                        continue  # Skip duplicates
+                    
+                    # Extract content
+                    title = entry.get('title', 'No title')
+                    content_text = entry.get('summary', entry.get('description', ''))
+                    published_date = None
+                    
+                    if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                        published_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+                    
+                    # Calculate relevance score based on AI/ML keywords
+                    relevance_score = _calculate_keyword_relevance(title + " " + content_text)
+                    
+                    # Only include relevant content (threshold > 0.3)
+                    if relevance_score > 0.3:
+                        content = DiscoveredContent(
+                            source_id=source.id,
+                            user_id=user_id,
+                            title=title[:500],  # Truncate to fit DB constraint
+                            content_text=content_text,
+                            content_url=entry.link,
+                            content_type='article',
+                            published_at=published_date.replace(tzinfo=None) if published_date else datetime.now(timezone.utc).replace(tzinfo=None),
+                            discovered_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                            relevance_score=relevance_score,
+                            credibility_score=0.75,  # RSS feeds generally credible
+                            engagement_prediction_score=min(relevance_score + 0.1, 1.0),
+                            overall_score=relevance_score,
+                            content_language='en',
+                            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
+                        )
+                        
+                        db.add(content)
+                        content_items.append(content)
+                
+                return content_items
+            else:
+                print(f"Failed to fetch RSS from {source.source_url}: HTTP {response.status}")
+                return []
+                
+    except Exception as e:
+        print(f"Error fetching RSS from {source.source_url}: {e}")
+        return []
+
+
+async def _fetch_newsapi_content(session: aiohttp.ClientSession, source: DiscoveredSource, user_id: int, db: AsyncSession):
+    """Fetch content from NewsAPI or similar APIs."""
+    # This would implement NewsAPI fetching
+    # For now, return empty as we focus on RSS feeds first
+    print(f"NewsAPI fetching not yet implemented for {source.source_url}")
+    return []
+
+
+def _calculate_keyword_relevance(text: str) -> float:
+    """Calculate relevance score based on AI/ML keywords."""
+    text_lower = text.lower()
+    
+    # AI/ML keywords with weights
+    keywords = {
+        'artificial intelligence': 1.0,
+        'machine learning': 0.9,
+        'ai': 0.8,
+        'ml': 0.7,
+        'openai': 0.9,
+        'anthropic': 0.9,
+        'gpt': 0.8,
+        'claude': 0.8,
+        'neural network': 0.8,
+        'deep learning': 0.9,
+        'llm': 0.8,
+        'large language model': 0.9,
+        'ai regulation': 0.9,
+        'ai safety': 0.8,
+        'chatgpt': 0.7,
+        'generative ai': 0.8,
+        'automation': 0.6,
+        'algorithm': 0.6,
+        'data science': 0.5,
+        'computer vision': 0.7,
+        'natural language processing': 0.8,
+        'nlp': 0.7
+    }
+    
+    total_score = 0
+    total_weight = 0
+    
+    for keyword, weight in keywords.items():
+        if keyword in text_lower:
+            # Multiple occurrences increase relevance
+            count = text_lower.count(keyword)
+            total_score += weight * min(count, 3)  # Cap at 3 occurrences
+            total_weight += weight
+    
+    # Normalize score
+    if total_weight > 0:
+        return min(total_score / total_weight, 1.0)
+    else:
+        return 0.0
 
 
 async def _execute_discovery_job_async(job_id: int, user_id: int):

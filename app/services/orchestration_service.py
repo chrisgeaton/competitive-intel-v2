@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, desc, func
 from pydantic import BaseModel
 
-from app.database import get_db_session
+from app.database import db_manager
 from app.models.user import User
 from app.models.delivery import UserDeliveryPreferences
 from app.models.discovery import DiscoveredContent
@@ -148,7 +148,7 @@ class OrchestrationService(BaseIntelligenceService):
         )
         
         try:
-            async with get_db_session() as db:
+            async with db_manager.get_session() as db:
                 # Step 1: Get user configuration
                 user_config = await self._get_user_pipeline_config(db, user_id, custom_config)
                 
@@ -341,20 +341,43 @@ class OrchestrationService(BaseIntelligenceService):
                     'published_at': item.published_at
                 })
             
-            # Note: Would call AnalysisService.perform_deep_analysis() here
-            # For now, create mock results
-            for item in batch_items:
-                mock_result = {
-                    'content_id': item['content_id'],
-                    'filter_passed': True,
-                    'filter_priority': 'medium',
-                    'strategic_alignment': 0.7,
-                    'competitive_impact': 0.6,
-                    'urgency_score': 0.5,
-                    'ai_cost_cents': 5,
-                    'processing_time_ms': 1500
-                }
-                analysis_results.append(mock_result)
+            # Call actual AnalysisService for real analysis
+            try:
+                # Create analysis batch first
+                analysis_batch = await self.analysis_service.create_analysis_batch(
+                    db=db,
+                    user_id=config.user_id,
+                    max_items=len(batch_items)
+                )
+                
+                if analysis_batch:
+                    # Execute deep analysis on the batch
+                    batch_results = await self.analysis_service.perform_deep_analysis(
+                        db=db,
+                        batch=analysis_batch
+                    )
+                    
+                    if batch_results:
+                        analysis_results.extend(batch_results)
+                else:
+                    self.logger.info("No analysis batch created - no content to analyze")
+                
+            except Exception as e:
+                self.logger.error(f"Analysis service failed for batch: {e}")
+                # Fall back to mock results for this batch
+                for item in batch_items:
+                    mock_result = {
+                        'content_id': item['content_id'],
+                        'filter_passed': False,
+                        'filter_priority': 'low',
+                        'strategic_alignment': 0.0,
+                        'competitive_impact': 0.0,
+                        'urgency_score': 0.0,
+                        'ai_cost_cents': 0,
+                        'processing_time_ms': 0,
+                        'error': str(e)
+                    }
+                    analysis_results.append(mock_result)
         
         return analysis_results
     
@@ -528,7 +551,7 @@ class OrchestrationService(BaseIntelligenceService):
             Summary of scheduling results
         """
         try:
-            async with get_db_session() as db:
+            async with db_manager.get_session() as db:
                 # Get active users with email delivery enabled
                 active_users_query = select(User.id).join(
                     UserDeliveryPreferences

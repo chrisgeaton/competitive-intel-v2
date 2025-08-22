@@ -14,7 +14,7 @@ from sqlalchemy import select, and_, desc
 from pydantic import BaseModel, Field
 
 from app.database import get_db_session
-from app.auth.dependencies import get_current_user
+from app.middleware import get_current_user
 from app.models.user import User
 from app.services.report_service import (
     ReportService, ReportGenerationRequest, ReportOutput, 
@@ -254,7 +254,7 @@ async def get_report_content(
 @router.post("/email/send", response_model=EmailDeliveryResponse)
 async def send_email_report(
     report_id: Optional[str] = None,
-    regenerate: bool = Field(default=False),
+    regenerate: bool = Query(default=False),
     recipient_email: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
@@ -381,7 +381,7 @@ async def get_engagement_analytics(
 async def schedule_report_delivery(
     schedule_time: datetime,
     report_config: GenerateReportRequest,
-    recurrence: Optional[str] = Query(None, regex="^(daily|weekly|monthly)$"),
+    recurrence: Optional[str] = Query(None, pattern="^(daily|weekly|monthly)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
 ):
