@@ -16,19 +16,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import desc, select, and_, func
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
+from app.database import get_db_session
 from app.services.analysis_service import AnalysisService
 from app.services.ai_service import AIProvider
 from app.models.analysis import AnalysisResult, StrategicInsight, AnalysisJob
 from app.models.user import User
 from app.models.discovery import DiscoveredContent
 from app.analysis.core import AnalysisStage, ContentPriority, AnalysisContext
-from app.utils.auth import get_current_user
+from app.auth_deps.dependencies import get_current_user
 from app.utils.exceptions import errors
 
 
 # Initialize router and service
-router = APIRouter(prefix="/analysis", tags=["analysis"])
+router = APIRouter(prefix="/api/v1/analysis", tags=["analysis"])
 analysis_service = AnalysisService()
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ async def create_analysis_batch(
     batch_request: AnalysisBatchCreate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_session)
 ):
     """
     Create analysis batch for pending content.
@@ -216,7 +216,7 @@ async def analyze_single_content(
     content_id: int = Path(..., description="Content ID to analyze"),
     analysis_request: SingleContentAnalysisRequest = Body(...),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_session)
 ):
     """
     Analyze single content item with AI.
@@ -330,7 +330,7 @@ async def get_analysis_results(
     min_relevance: Optional[float] = Query(default=None, ge=0.0, le=1.0),
     priority_filter: Optional[List[str]] = Query(default=None),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_session)
 ):
     """
     Get analysis results for user.
@@ -379,7 +379,7 @@ async def get_strategic_insights(
     priority_filter: Optional[List[str]] = Query(default=None),
     actionable_only: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_session)
 ):
     """
     Get strategic insights for user.
@@ -426,7 +426,7 @@ async def mark_insight_actionable(
     actionable: bool = Body(..., embed=True),
     notes: Optional[str] = Body(default=None, embed=True),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_session)
 ):
     """Mark strategic insight as actionable or not actionable."""
     try:
@@ -466,7 +466,7 @@ async def mark_insight_actionable(
 async def get_analysis_stats(
     days: int = Query(default=30, ge=1, le=365),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_session)
 ):
     """
     Get analysis statistics for user.

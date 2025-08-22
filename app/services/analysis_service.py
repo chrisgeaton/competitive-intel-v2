@@ -223,7 +223,7 @@ class AnalysisService(BaseAnalysisService, ValidationMixin, ErrorHandlingMixin, 
         self,
         content: Dict[str, Any],
         context: AnalysisContext
-    ) -> ServiceFilterResult:
+    ) -> FilterResult:
         """
         Stage 1: Calculate filter score for content using centralized processing.
         """
@@ -298,7 +298,7 @@ class AnalysisService(BaseAnalysisService, ValidationMixin, ErrorHandlingMixin, 
             else:
                 filter_reason = f"Below threshold (score: {relevance_score:.2f})"
                 
-        return ServiceFilterResult(
+        return FilterResult(
             content_id=content_id,
             passed=passed,
             relevance_score=relevance_score,
@@ -1282,3 +1282,38 @@ class AnalysisService(BaseAnalysisService, ValidationMixin, ErrorHandlingMixin, 
             await db.rollback()
             self.logger.error(f"Failed to create analysis job: {e}")
             raise
+    
+    async def process_content(
+        self,
+        content: Dict[str, Any],
+        context: AnalysisContext
+    ) -> Dict[str, Any]:
+        """
+        Process single content item through analysis pipeline.
+        Implementation of abstract method from BaseAnalysisService.
+        """
+        try:
+            # Stage 1: Filter content
+            filter_result = self.calculate_filter_score(content, context)
+            if not filter_result.passed:
+                return {
+                    "content_id": content.get("id", 0),
+                    "status": "filtered",
+                    "filter_reason": filter_result.filter_reason,
+                    "relevance_score": filter_result.relevance_score
+                }
+            
+            # Stage 2 & 3: AI Analysis if content passed filtering
+            analysis_result = await self.analyze_content_stages(
+                content, context, [AnalysisStage.RELEVANCE_ANALYSIS, AnalysisStage.INSIGHT_EXTRACTION]
+            )
+            
+            return analysis_result
+            
+        except Exception as e:
+            self.logger.error(f"Failed to process content {content.get('id', 0)}: {e}")
+            return {
+                "content_id": content.get("id", 0),
+                "status": "error",
+                "error": str(e)
+            }

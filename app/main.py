@@ -2,60 +2,47 @@
 Main FastAPI application for the User Config Service.
 """
 
-import logging
-from datetime import datetime
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status
+# import logging
+# from datetime import datetime
+# from contextlib import asynccontextmanager
+from fastapi import FastAPI  # , Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
+# from fastapi.responses import JSONResponse
+# from fastapi.exceptions import RequestValidationError
+# from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
-from app.database import init_db, close_db
+# from app.database import init_db, close_db
 from app.middleware import (
     SecurityHeadersMiddleware, 
     RateLimitMiddleware, 
     AuthenticationMiddleware
 )
 from app.routers import auth_router, users_router, strategic_profile_router, focus_areas_router, entity_tracking_router, delivery_preferences_router
+# Phase 2-4 routers
 from app.routers.discovery import router as discovery_router
 from app.routers.analysis import router as analysis_router
 from app.routers.reports import router as reports_router
 from app.routers.orchestration import router as orchestration_router
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL),
-    format=settings.LOG_FORMAT
-)
-logger = logging.getLogger(__name__)
+# Configure logging - COMMENTED OUT
+# logging.basicConfig(
+#     level=getattr(logging, settings.LOG_LEVEL),
+#     format=settings.LOG_FORMAT
+# )
+# logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan management."""
-    # Startup
-    logger.info("Starting User Config Service...")
-    try:
-        await init_db()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
-        raise
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down User Config Service...")
-    await close_db()
-    logger.info("Database connections closed")
+# LIFESPAN COMMENTED OUT FOR TESTING
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     pass
 
 
 # Create FastAPI application
 app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
+    title="Test",  # settings.APP_NAME,
+    version="1.0",  # settings.APP_VERSION,
     description="""
 ## Competitive Intelligence v2 - Complete Platform
 
@@ -83,9 +70,9 @@ Authorization: Bearer <your_jwt_token>
 
 Get your token by using the `/api/v1/auth/login` endpoint.
     """,
-    lifespan=lifespan,
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
+    # lifespan=lifespan,
+    docs_url="/docs",  # Always enable for development
+    redoc_url="/redoc",  # Always enable for development
     contact={
         "name": "Competitive Intelligence v2 Support",
         "email": "support@competitive-intel.com"
@@ -96,19 +83,19 @@ Get your token by using the `/api/v1/auth/login` endpoint.
     }
 )
 
-# Add CORS middleware
+# Test 1: CORS only - no custom middleware
+app.add_middleware(AuthenticationMiddleware)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
-    allow_methods=settings.CORS_ALLOW_METHODS,
-    allow_headers=settings.CORS_ALLOW_HEADERS,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
-
-# Add custom middleware
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(RateLimitMiddleware, requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE)
-app.add_middleware(AuthenticationMiddleware)
 
 # Include routers
 app.include_router(auth_router)
@@ -117,6 +104,7 @@ app.include_router(strategic_profile_router)
 app.include_router(focus_areas_router)
 app.include_router(entity_tracking_router)
 app.include_router(delivery_preferences_router)
+# Phase 2-4 routers
 app.include_router(discovery_router)
 app.include_router(analysis_router)
 app.include_router(reports_router)
@@ -125,88 +113,29 @@ app.include_router(orchestration_router)
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
-    return {
-        "service": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "status": "running"
-    }
+    return {"message": "Competitive Intelligence v2 API", "status": "operational"}
 
+@app.get("/test-cors")
+async def test_cors_endpoint():
+    return {"message": "CORS test successful", "timestamp": "2025-08-22T12:07:00Z"}
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    from app.database import db_manager
-    
-    try:
-        db_healthy = await db_manager.health_check()
-        
-        return {
-            "status": "healthy" if db_healthy else "unhealthy",
-            "database": "connected" if db_healthy else "disconnected",
-            "timestamp": str(datetime.utcnow())
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "unhealthy",
-                "database": "error",
-                "error": str(e),
-                "timestamp": str(datetime.utcnow())
-            }
-        )
+    return {"status": "healthy", "version": "2.0.0"}
 
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle request validation errors."""
-    logger.warning(f"Validation error on {request.url.path}: {exc.errors()}")
-    return JSONResponse(
-        status_code=422,
-        content={
-            "detail": "Validation error",
-            "errors": exc.errors(),
-            "type": "validation_error"
-        }
-    )
+# ALL EXCEPTION HANDLERS COMMENTED OUT FOR TESTING
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#     pass
 
+# @app.exception_handler(StarletteHTTPException)
+# async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+#     pass
 
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    """Handle HTTP exceptions."""
-    if exc.status_code == 404:
-        return JSONResponse(
-            status_code=404,
-            content={
-                "detail": "The requested resource was not found",
-                "path": str(request.url.path),
-                "type": "not_found"
-            }
-        )
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "detail": exc.detail,
-            "type": "http_error"
-        }
-    )
-
-
-@app.exception_handler(500)
-async def internal_error_handler(request: Request, exc):
-    """Handle internal server errors."""
-    logger.error(f"Internal server error on {request.url.path}: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "Internal server error",
-            "type": "server_error",
-            "timestamp": str(datetime.utcnow())
-        }
-    )
+# @app.exception_handler(500)
+# async def internal_error_handler(request: Request, exc):
+#     pass
 
 
 if __name__ == "__main__":
@@ -216,6 +145,6 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower()
+        reload=True,
+        log_level="info"
     )

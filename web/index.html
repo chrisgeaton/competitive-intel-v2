@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitive Intelligence v2 - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card-hover:hover { transform: translateY(-2px); transition: transform 0.2s; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-blue-600 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold">🧠 Competitive Intelligence v2</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="user-info" class="hidden">Welcome, <span id="user-name"></span></span>
+                    <button id="logout-btn" class="hidden bg-blue-500 hover:bg-blue-700 px-3 py-1 rounded">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Login Section -->
+        <div id="login-section" class="max-w-md mx-auto">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-2xl font-bold text-center mb-6">Login to Your Intelligence Dashboard</h2>
+                
+                <!-- Login Form -->
+                <div id="login-form">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                        <input type="email" id="login-email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="admin@yourcompany.com">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="login-password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Your password">
+                    </div>
+                    <button onclick="login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                        Login
+                    </button>
+                    <p class="mt-4 text-center text-sm text-gray-600">
+                        Don't have an account? 
+                        <a href="#" onclick="showRegister()" class="text-blue-600 hover:text-blue-800">Register here</a>
+                    </p>
+                </div>
+
+                <!-- Register Form -->
+                <div id="register-form" class="hidden">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Full Name</label>
+                        <input type="text" id="register-name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Your full name">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                        <input type="email" id="register-email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="admin@yourcompany.com">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="register-password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Secure password">
+                        <p class="text-xs text-gray-500 mt-1">Min 8 characters with uppercase, lowercase, digit, and special character</p>
+                    </div>
+                    <button onclick="register()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                        Create Account
+                    </button>
+                    <p class="mt-4 text-center text-sm text-gray-600">
+                        Already have an account? 
+                        <a href="#" onclick="showLogin()" class="text-blue-600 hover:text-blue-800">Login here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="hidden fade-in">
+            <!-- Quick Actions -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow-md p-6 card-hover cursor-pointer" onclick="showSection('profile')">
+                    <div class="flex items-center">
+                        <div class="text-blue-600 text-2xl mr-4">👤</div>
+                        <div>
+                            <h3 class="font-semibold">Strategic Profile</h3>
+                            <p class="text-gray-600 text-sm">Set your business context</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6 card-hover cursor-pointer" onclick="showSection('focus')">
+                    <div class="flex items-center">
+                        <div class="text-green-600 text-2xl mr-4">🎯</div>
+                        <div>
+                            <h3 class="font-semibold">Focus Areas</h3>
+                            <p class="text-gray-600 text-sm">Define intelligence targets</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6 card-hover cursor-pointer" onclick="showSection('entities')">
+                    <div class="flex items-center">
+                        <div class="text-purple-600 text-2xl mr-4">🏢</div>
+                        <div>
+                            <h3 class="font-semibold">Entity Tracking</h3>
+                            <p class="text-gray-600 text-sm">Monitor competitors</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6 card-hover cursor-pointer" onclick="showSection('delivery')">
+                    <div class="flex items-center">
+                        <div class="text-orange-600 text-2xl mr-4">📧</div>
+                        <div>
+                            <h3 class="font-semibold">Delivery Settings</h3>
+                            <p class="text-gray-600 text-sm">Configure reports</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Sections -->
+            <div id="content-area" class="bg-white rounded-lg shadow-md p-6">
+                <div id="welcome-content">
+                    <h2 class="text-2xl font-bold mb-4">Welcome to Your Intelligence Dashboard</h2>
+                    <p class="text-gray-600 mb-6">Your competitive intelligence system is ready! Click on the cards above to configure your intelligence pipeline:</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h3 class="font-semibold text-blue-800 mb-2">🎯 Phase 1: Configuration</h3>
+                            <ul class="text-sm text-blue-700 space-y-1">
+                                <li>• Set up your strategic profile</li>
+                                <li>• Define focus areas and keywords</li>
+                                <li>• Configure entity tracking</li>
+                                <li>• Set delivery preferences</li>
+                            </ul>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h3 class="font-semibold text-green-800 mb-2">🚀 Next: Intelligence Pipeline</h3>
+                            <ul class="text-sm text-green-700 space-y-1">
+                                <li>• Discover relevant content</li>
+                                <li>• AI-powered analysis</li>
+                                <li>• Generate strategic reports</li>
+                                <li>• Email delivery</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic content will be loaded here -->
+                <div id="dynamic-content" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="message-area" class="fixed bottom-4 right-4 z-50"></div>
+
+    <script>
+        // Global state
+        let currentUser = null;
+        let authToken = null;
+        const API_BASE = 'http://localhost:8000/api/v1';
+
+        // API Configuration
+        axios.defaults.baseURL = API_BASE;
+        
+        // Check for existing token on load
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                authToken = token;
+                axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                getCurrentUser();
+            }
+        });
+
+        // Authentication Functions
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            if (!email || !password) {
+                showMessage('Please enter both email and password', 'error');
+                return;
+            }
+
+            try {
+                const response = await axios.post('/auth/login', { email, password });
+                authToken = response.data.access_token;
+                localStorage.setItem('authToken', authToken);
+                axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+                
+                showMessage('Login successful!', 'success');
+                getCurrentUser();
+            } catch (error) {
+                showMessage(error.response?.data?.detail || 'Login failed', 'error');
+            }
+        }
+
+        async function register() {
+            const name = document.getElementById('register-name').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+
+            if (!name || !email || !password) {
+                showMessage('Please fill in all fields', 'error');
+                return;
+            }
+
+            try {
+                await axios.post('/auth/register', { name, email, password });
+                showMessage('Account created successfully! Please login.', 'success');
+                showLogin();
+                
+                // Pre-fill login form
+                document.getElementById('login-email').value = email;
+            } catch (error) {
+                showMessage(error.response?.data?.detail || 'Registration failed', 'error');
+            }
+        }
+
+        async function getCurrentUser() {
+            try {
+                const response = await axios.get('/auth/me');
+                currentUser = response.data;
+                showDashboard();
+            } catch (error) {
+                logout();
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            currentUser = null;
+            localStorage.removeItem('authToken');
+            delete axios.defaults.headers.common['Authorization'];
+            showLoginSection();
+        }
+
+        // UI Functions
+        function showLogin() {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+        }
+
+        function showRegister() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+        }
+
+        function showLoginSection() {
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('dashboard-section').classList.add('hidden');
+            document.getElementById('user-info').classList.add('hidden');
+            document.getElementById('logout-btn').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+            document.getElementById('user-info').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+            document.getElementById('user-name').textContent = currentUser.name;
+        }
+
+        function showSection(section) {
+            document.getElementById('welcome-content').classList.add('hidden');
+            document.getElementById('dynamic-content').classList.remove('hidden');
+            
+            const content = document.getElementById('dynamic-content');
+            
+            switch(section) {
+                case 'profile':
+                    content.innerHTML = getProfileForm();
+                    loadStrategicProfile();
+                    break;
+                case 'focus':
+                    content.innerHTML = getFocusAreasForm();
+                    loadFocusAreas();
+                    break;
+                case 'entities':
+                    content.innerHTML = getEntitiesForm();
+                    loadEntities();
+                    break;
+                case 'delivery':
+                    content.innerHTML = getDeliveryForm();
+                    loadDeliverySettings();
+                    break;
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('message-area');
+            const messageDiv = document.createElement('div');
+            
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            
+            messageDiv.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg mb-2 fade-in`;
+            messageDiv.textContent = message;
+            
+            messageArea.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        // Configuration Forms
+        function getProfileForm() {
+            return `
+                <h2 class="text-2xl font-bold mb-6">Strategic Profile</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Industry</label>
+                        <select id="industry" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Industry</option>
+                            <option value="technology">Technology</option>
+                            <option value="healthcare">Healthcare</option>
+                            <option value="finance">Finance</option>
+                            <option value="education">Education</option>
+                            <option value="manufacturing">Manufacturing</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Organization Type</label>
+                        <select id="organization_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Type</option>
+                            <option value="startup">Startup</option>
+                            <option value="enterprise">Enterprise</option>
+                            <option value="nonprofit">Nonprofit</option>
+                            <option value="government">Government</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Your Role</label>
+                        <select id="role" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Role</option>
+                            <option value="ceo">CEO</option>
+                            <option value="manager">Manager</option>
+                            <option value="analyst">Analyst</option>
+                            <option value="consultant">Consultant</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Organization Size</label>
+                        <select id="organization_size" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Size</option>
+                            <option value="micro">Micro (1-10)</option>
+                            <option value="small">Small (11-50)</option>
+                            <option value="medium">Medium (51-250)</option>
+                            <option value="large">Large (251-1000)</option>
+                            <option value="enterprise">Enterprise (1000+)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button onclick="saveStrategicProfile()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                        Save Strategic Profile
+                    </button>
+                </div>
+            `;
+        }
+
+        function getFocusAreasForm() {
+            return `
+                <h2 class="text-2xl font-bold mb-6">Focus Areas</h2>
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                    <h3 class="font-semibold mb-3">Add New Focus Area</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="text" id="focus-name" placeholder="Focus Area Name" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="focus-keywords" placeholder="Keywords (comma-separated)" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="focus-priority" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="4">Critical Priority</option>
+                            <option value="3">High Priority</option>
+                            <option value="2" selected>Medium Priority</option>
+                            <option value="1">Low Priority</option>
+                        </select>
+                    </div>
+                    <button onclick="addFocusArea()" class="mt-3 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                        Add Focus Area
+                    </button>
+                </div>
+                <div id="focus-areas-list"></div>
+            `;
+        }
+
+        function getEntitiesForm() {
+            return `
+                <h2 class="text-2xl font-bold mb-6">Entity Tracking</h2>
+                <div class="mb-6 p-4 bg-purple-50 rounded-lg">
+                    <h3 class="font-semibold mb-3">Track New Entity</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <input type="text" id="entity-name" placeholder="Entity Name" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="entity-type" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="competitor">Competitor</option>
+                            <option value="technology">Technology</option>
+                            <option value="person">Person</option>
+                            <option value="organization">Organization</option>
+                        </select>
+                        <input type="text" id="entity-keywords" placeholder="Keywords" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="entity-priority" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="critical">Critical</option>
+                            <option value="high" selected>High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <button onclick="addEntity()" class="mt-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                        Track Entity
+                    </button>
+                </div>
+                <div id="entities-list"></div>
+            `;
+        }
+
+        function getDeliveryForm() {
+            return `
+                <h2 class="text-2xl font-bold mb-6">Delivery Settings</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Email Address</label>
+                        <input type="email" id="delivery-email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value="${currentUser.email}">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Frequency</label>
+                        <select id="delivery-frequency" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Send Time</label>
+                        <input type="time" id="delivery-time" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value="09:00">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Format</label>
+                        <select id="delivery-format" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="digest">Digest</option>
+                            <option value="detailed">Detailed</option>
+                            <option value="summary">Summary</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button onclick="saveDeliverySettings()" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                        Save Delivery Settings
+                    </button>
+                </div>
+            `;
+        }
+
+        // API Functions
+        async function loadStrategicProfile() {
+            try {
+                const response = await axios.get('/strategic-profile/');
+                const profile = response.data;
+                
+                if (profile.industry) document.getElementById('industry').value = profile.industry;
+                if (profile.organization_type) document.getElementById('organization_type').value = profile.organization_type;
+                if (profile.role) document.getElementById('role').value = profile.role;
+                if (profile.organization_size) document.getElementById('organization_size').value = profile.organization_size;
+            } catch (error) {
+                // Profile doesn't exist yet, that's okay
+            }
+        }
+
+        async function saveStrategicProfile() {
+            const profileData = {
+                industry: document.getElementById('industry').value,
+                organization_type: document.getElementById('organization_type').value,
+                role: document.getElementById('role').value,
+                organization_size: document.getElementById('organization_size').value,
+                strategic_goals: ["competitive_analysis", "market_expansion"]
+            };
+
+            try {
+                await axios.post('/strategic-profile/', profileData);
+                showMessage('Strategic profile saved successfully!', 'success');
+            } catch (error) {
+                showMessage(error.response?.data?.detail || 'Failed to save profile', 'error');
+            }
+        }
+
+        async function loadFocusAreas() {
+            try {
+                const response = await axios.get('/users/focus-areas/');
+                const focusAreas = response.data.focus_areas || [];
+                
+                const listElement = document.getElementById('focus-areas-list');
+                listElement.innerHTML = focusAreas.map(area => `
+                    <div class="bg-gray-50 p-4 rounded-lg mb-3">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h4 class="font-semibold">${area.focus_area}</h4>
+                                <p class="text-sm text-gray-600">Keywords: ${area.keywords.join(', ')}</p>
+                                <p class="text-sm text-gray-500">Priority: ${area.priority}</p>
+                            </div>
+                            <button onclick="deleteFocusArea(${area.id})" class="text-red-600 hover:text-red-800">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('focus-areas-list').innerHTML = '<p class="text-gray-500">No focus areas configured yet.</p>';
+            }
+        }
+
+        async function addFocusArea() {
+            const name = document.getElementById('focus-name').value;
+            const keywords = document.getElementById('focus-keywords').value.split(',').map(k => k.trim());
+            const priority = parseInt(document.getElementById('focus-priority').value);
+
+            if (!name || keywords.length === 0) {
+                showMessage('Please enter focus area name and keywords', 'error');
+                return;
+            }
+
+            try {
+                await axios.post('/users/focus-areas/', {
+                    focus_area: name,
+                    keywords: keywords,
+                    priority: priority
+                });
+                
+                document.getElementById('focus-name').value = '';
+                document.getElementById('focus-keywords').value = '';
+                
+                showMessage('Focus area added successfully!', 'success');
+                loadFocusAreas();
+            } catch (error) {
+                showMessage(error.response?.data?.detail || 'Failed to add focus area', 'error');
+            }
+        }
+
+        async function deleteFocusArea(id) {
+            try {
+                await axios.delete(`/users/focus-areas/${id}`);
+                showMessage('Focus area deleted', 'success');
+                loadFocusAreas();
+            } catch (error) {
+                showMessage('Failed to delete focus area', 'error');
+            }
+        }
+
+        async function loadEntities() {
+            try {
+                const response = await axios.get('/users/entity-tracking/');
+                const entities = response.data.tracked_entities || [];
+                
+                const listElement = document.getElementById('entities-list');
+                listElement.innerHTML = entities.map(entity => `
+                    <div class="bg-gray-50 p-4 rounded-lg mb-3">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h4 class="font-semibold">${entity.entity.name}</h4>
+                                <p class="text-sm text-gray-600">Type: ${entity.entity.entity_type}</p>
+                                <p class="text-sm text-gray-500">Priority: ${entity.priority}</p>
+                            </div>
+                            <button onclick="deleteEntity(${entity.id})" class="text-red-600 hover:text-red-800">Stop Tracking</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('entities-list').innerHTML = '<p class="text-gray-500">No entities being tracked yet.</p>';
+            }
+        }
+
+        async function addEntity() {
+            const name = document.getElementById('entity-name').value;
+            const entityType = document.getElementById('entity-type').value;
+            const keywords = document.getElementById('entity-keywords').value.split(',').map(k => k.trim());
+            const priority = document.getElementById('entity-priority').value;
+
+            if (!name) {
+                showMessage('Please enter entity name', 'error');
+                return;
+            }
+
+            try {
+                // First create the entity
+                const entityResponse = await axios.post('/users/entity-tracking/entities', {
+                    name: name,
+                    entity_type: entityType,
+                    keywords: keywords
+                });
+
+                // Then track it
+                await axios.post('/users/entity-tracking/', {
+                    entity_id: entityResponse.data.id,
+                    priority: priority,
+                    custom_keywords: keywords,
+                    tracking_enabled: true
+                });
+                
+                document.getElementById('entity-name').value = '';
+                document.getElementById('entity-keywords').value = '';
+                
+                showMessage('Entity tracking started!', 'success');
+                loadEntities();
+            } catch (error) {
+                showMessage(error.response?.data?.detail || 'Failed to add entity', 'error');
+            }
+        }
+
+        async function deleteEntity(id) {
+            try {
+                await axios.delete(`/users/entity-tracking/${id}`);
+                showMessage('Stopped tracking entity', 'success');
+                loadEntities();
+            } catch (error) {
+                showMessage('Failed to stop tracking', 'error');
+            }
+        }
+
+        async function loadDeliverySettings() {
+            try {
+                const response = await axios.get('/users/delivery-preferences/');
+                const settings = response.data;
+                
+                if (settings.email) document.getElementById('delivery-email').value = settings.email;
+                if (settings.frequency) document.getElementById('delivery-frequency').value = settings.frequency;
+                if (settings.send_time) document.getElementById('delivery-time').value = settings.send_time;
+                if (settings.format) document.getElementById('delivery-format').value = settings.format;
+            } catch (error) {
+                // Settings don't exist yet, that's okay
+            }
+        }
+
+        async function saveDeliverySettings() {
+            const settings = {
+                email: document.getElementById('delivery-email').value,
+                frequency: document.getElementById('delivery-frequency').value,
+                send_time: document.getElementById('delivery-time').value,
+                format: document.getElementById('delivery-format').value,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+
+            try {
+                await axios.post('/users/delivery-preferences/', settings);
+                showMessage('Delivery settings saved successfully!', 'success');
+            } catch (error) {
+                showMessage(error.response?.data?.detail || 'Failed to save settings', 'error');
+            }
+        }
+
+        // Logout button event
+        document.getElementById('logout-btn').addEventListener('click', logout);
+    </script>
+</body>
+</html>
