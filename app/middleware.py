@@ -15,7 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import select
 
 from app.config import settings, SECURITY_HEADERS
-from app.auth import auth_service
+import app.auth as auth_module
 from app.models.user import User
 from app.utils.exceptions import errors
 
@@ -143,7 +143,7 @@ class JWTBearer(HTTPBearer):
             if not credentials.scheme == "Bearer":
                 raise errors.unauthorized("Invalid authentication scheme")
             
-            token_data = auth_service.decode_token(credentials.credentials)
+            token_data = auth_module.auth_service.decode_token(credentials.credentials)
             if not token_data:
                 raise errors.unauthorized("Invalid token or expired token")
             
@@ -219,7 +219,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 )
             
             token = auth_header.split(" ")[1]
-            token_data = auth_service.decode_token(token)
+            token_data = auth_module.auth_service.decode_token(token)
             
             if not token_data:
                 return JSONResponse(
