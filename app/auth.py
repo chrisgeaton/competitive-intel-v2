@@ -2,7 +2,7 @@
 
 import secrets
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -92,13 +92,13 @@ class AuthService:
         to_encode = data.copy()
         
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + settings.access_token_expire_timedelta
+            expire = datetime.now(timezone.utc) + settings.access_token_expire_timedelta
         
         to_encode.update({
             "exp": expire,
-            "iat": datetime.utcnow(),
+            "iat": datetime.now(timezone.utc),
             "type": "access"
         })
         
@@ -127,13 +127,13 @@ class AuthService:
         to_encode = data.copy()
         
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + settings.refresh_token_expire_timedelta
+            expire = datetime.now(timezone.utc) + settings.refresh_token_expire_timedelta
         
         to_encode.update({
             "exp": expire,
-            "iat": datetime.utcnow(),
+            "iat": datetime.now(timezone.utc),
             "type": "refresh",
             "jti": secrets.token_urlsafe(32)  # Unique token ID
         })
@@ -264,9 +264,9 @@ class AuthService:
             
             # Calculate expiration
             if remember_me:
-                expires_at = datetime.utcnow() + settings.session_remember_me_timedelta
+                expires_at = datetime.now(timezone.utc) + settings.session_remember_me_timedelta
             else:
-                expires_at = datetime.utcnow() + settings.session_expire_timedelta
+                expires_at = datetime.now(timezone.utc) + settings.session_expire_timedelta
             
             # Create session
             session = UserSession(
@@ -305,7 +305,7 @@ class AuthService:
                 delete(UserSession).where(
                     and_(
                         UserSession.user_id == user_id,
-                        UserSession.expires_at < datetime.utcnow()
+                        UserSession.expires_at < datetime.now(timezone.utc)
                     )
                 )
             )

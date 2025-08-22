@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc, func
 
-from app.database import get_db_session
+from app.database import db_manager
 from app.models.user import User
 from app.models.strategic_profile import UserStrategicProfile, UserFocusArea
 from app.models.tracking import UserEntityTracking  

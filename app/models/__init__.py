@@ -10,6 +10,9 @@ from .discovery import (
     DiscoveredSource, DiscoveredContent, ContentEngagement,
     DiscoveryJob, MLModelMetrics
 )
+from .analysis import (
+    AnalysisResult, StrategicInsight, AnalysisJob
+)
 
 __all__ = [
     'User',
@@ -23,5 +26,8 @@ __all__ = [
     'DiscoveredContent',
     'ContentEngagement',
     'DiscoveryJob',
-    'MLModelMetrics'
+    'MLModelMetrics',
+    'AnalysisResult',
+    'StrategicInsight',
+    'AnalysisJob'
 ]

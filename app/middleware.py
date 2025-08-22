@@ -183,7 +183,10 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/api/v1/focus-areas",
         "/api/v1/entities",
         "/api/v1/preferences",
-        "/api/v1/discovery"
+        "/api/v1/discovery",
+        "/api/v1/analysis",
+        "/api/v1/orchestration",
+        "/api/v1/reports"
     ]
     
     # Specific protected auth routes  

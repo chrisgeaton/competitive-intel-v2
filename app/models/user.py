@@ -2,7 +2,7 @@
 User and authentication models for the Competitive Intelligence v2 system.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, 
@@ -70,6 +70,27 @@ class User(Base):
         lazy="selectin"
     )
     
+    analysis_results: Mapped[List["AnalysisResult"]] = relationship(
+        "AnalysisResult",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+    
+    strategic_insights: Mapped[List["StrategicInsight"]] = relationship(
+        "StrategicInsight",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+    
+    analysis_jobs: Mapped[List["AnalysisJob"]] = relationship(
+        "AnalysisJob",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+    
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, name={self.name})>"
     
@@ -85,7 +106,7 @@ class User(Base):
     
     def update_last_login(self):
         """Update the last login timestamp."""
-        self.last_login = datetime.utcnow()
+        self.last_login = datetime.now(timezone.utc)
 
 
 class UserSession(Base):
@@ -117,7 +138,7 @@ class UserSession(Base):
     @property
     def is_expired(self) -> bool:
         """Check if the session has expired."""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
     
     @property
     def is_valid(self) -> bool:

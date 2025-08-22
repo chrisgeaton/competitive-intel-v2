@@ -84,16 +84,14 @@ async def get_focus_areas(
             response.priority_label = fa.priority_label
             items.append(response)
         
+        total_pages = math.ceil(total_items / pagination.per_page) if total_items > 0 else 1
+        
         return FocusAreaListResponse(
             items=items,
-            pagination={
-                "page": pagination.page,
-                "per_page": pagination.per_page,
-                "total_items": total_items,
-                "total_pages": math.ceil(total_items / pagination.per_page) if total_items > 0 else 1,
-                "has_next": pagination.page < (math.ceil(total_items / pagination.per_page) if total_items > 0 else 1),
-                "has_prev": pagination.page > 1
-            }
+            total=total_items,
+            page=pagination.page,
+            per_page=pagination.per_page,
+            pages=total_pages
         )
     
     return await base_ops.execute_db_operation(

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Competitive Intelligence v2"
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = Field(default=False)
+    ENVIRONMENT: str = Field(default="development")
     
     # Database settings
     DATABASE_URL: str = Field(
@@ -65,6 +66,19 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = Field(default="gpt-4-turbo-preview")
     OPENAI_MAX_TOKENS: int = Field(default=2000)
     OPENAI_TEMPERATURE: float = Field(default=0.7)
+    
+    # External API Keys
+    NEWS_API_KEY: Optional[str] = Field(default=None)
+    SENDGRID_API_KEY: Optional[str] = Field(default=None)
+    GOOGLE_CSE_ID: Optional[str] = Field(default=None)
+    GOOGLE_API_KEY: Optional[str] = Field(default=None)
+    TWITTER_BEARER_TOKEN: Optional[str] = Field(default=None)
+    REDDIT_CLIENT_ID: Optional[str] = Field(default=None)
+    REDDIT_CLIENT_SECRET: Optional[str] = Field(default=None)
+    LINKEDIN_CLIENT_ID: Optional[str] = Field(default=None)
+    LINKEDIN_CLIENT_SECRET: Optional[str] = Field(default=None)
+    PODCAST_INDEX_API_KEY: Optional[str] = Field(default=None)
+    PODCAST_INDEX_API_SECRET: Optional[str] = Field(default=None)
     
     # Logging settings
     LOG_LEVEL: str = Field(default="INFO")
@@ -143,7 +157,7 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "X-XSS-Protection": "1; mode=block",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'",
+    "Content-Security-Policy": "default-src 'self' https://cdn.jsdelivr.net https://fastapi.tiangolo.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' https://fastapi.tiangolo.com data:",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()"
 }

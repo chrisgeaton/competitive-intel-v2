@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, desc, func
 from pydantic import BaseModel, Field
 
-from app.database import get_db_session
+from app.database import db_manager
 from app.models.discovery import DiscoveredContent
 from app.models.analysis import AnalysisResult, StrategicInsight
 from app.analysis.core.shared_types import ContentPriority
@@ -134,7 +134,7 @@ class ReportService(BaseIntelligenceService):
         Returns:
             List of ReportOutput objects for each requested format
         """
-        async with get_db_session() as db:
+        async with db_manager.get_session() as db:
             # Step 1: Retrieve and curate content
             content_items = await self._retrieve_content_for_report(db, request)
             
