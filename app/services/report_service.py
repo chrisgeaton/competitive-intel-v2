@@ -185,7 +185,11 @@ class ReportService(BaseIntelligenceService):
             AnalysisResult.competitive_impact,
             AnalysisResult.urgency_score,
             AnalysisResult.filter_matched_entities,
-            AnalysisResult.filter_matched_keywords
+            AnalysisResult.filter_matched_keywords,
+            AnalysisResult.key_insights,
+            AnalysisResult.strategic_implications,
+            AnalysisResult.action_items,
+            AnalysisResult.executive_summary
         ).select_from(
             DiscoveredContent
         ).join(
@@ -227,8 +231,10 @@ class ReportService(BaseIntelligenceService):
             # Get source name
             source_name = await self._get_source_name(db, row.source_id)
             
-            # Create relevance explanation
-            relevance_explanation = self.create_relevance_explanation(
+            # Create enhanced relevance explanation using actual strategic insights
+            relevance_explanation = self._create_strategic_relevance_explanation(
+                row.key_insights or [],
+                row.strategic_implications or [],
                 row.filter_matched_entities or [],
                 row.filter_matched_keywords or [],
                 float(row.strategic_alignment or 0.0),
@@ -240,7 +246,7 @@ class ReportService(BaseIntelligenceService):
                 content_id=row.id,
                 title=row.title,
                 url=row.content_url,
-                priority=ContentPriority.from_score(float(row.strategic_alignment or 0.0)),
+                priority=ContentPriority[row.filter_priority.upper()] if row.filter_priority else ContentPriority.MEDIUM,
                 overall_score=float(row.overall_score or 0.0),
                 published_at=row.published_at,
                 source_name=source_name,
@@ -255,6 +261,165 @@ class ReportService(BaseIntelligenceService):
             content_items.append(content_item)
         
         return content_items
+    
+    def _extract_complete_sentences(
+        self, 
+        text: str, 
+        max_sentences: int = 2,
+        max_length: int = 250
+    ) -> str:
+        """
+        Extract complete sentences from text with proper boundary detection.
+        
+        Args:
+            text: Text to extract sentences from
+            max_sentences: Maximum number of sentences to extract
+            max_length: Maximum total character length
+            
+        Returns:
+            String containing complete sentences
+        """
+        if not text:
+            return ""
+        
+        # Clean the text
+        text = text.strip()
+        
+        # Handle common abbreviations to avoid false sentence boundaries
+        abbreviations = [
+            "Dr.", "Mr.", "Mrs.", "Ms.", "Inc.", "Corp.", "Co.", "Ltd.", 
+            "U.S.", "U.K.", "E.U.", "A.I.", "M.L.", "Ph.D.", "M.D.", "CEO",
+            "CTO", "CFO", "COO", "VP", "Sr.", "Jr.", "vs.", "etc.", "i.e.", "e.g."
+        ]
+        
+        # Replace abbreviations temporarily to avoid false splits
+        temp_text = text
+        replacements = {}
+        for i, abbr in enumerate(abbreviations):
+            placeholder = f"__ABBR_{i}__"
+            if abbr in temp_text:
+                replacements[placeholder] = abbr
+                temp_text = temp_text.replace(abbr, placeholder)
+        
+        # Split on sentence boundaries (. ! ?)
+        import re
+        # Match sentence endings: period/exclamation/question followed by space or end
+        sentence_pattern = r'(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])$'
+        sentences = re.split(sentence_pattern, temp_text)
+        
+        # Restore abbreviations in sentences
+        restored_sentences = []
+        for sentence in sentences:
+            for placeholder, abbr in replacements.items():
+                sentence = sentence.replace(placeholder, abbr)
+            sentence = sentence.strip()
+            if sentence:
+                restored_sentences.append(sentence)
+        
+        # Build result with complete sentences
+        result_sentences = []
+        total_length = 0
+        
+        for i, sentence in enumerate(restored_sentences):
+            if i >= max_sentences:
+                break
+                
+            # Check if adding this sentence would exceed max length
+            sentence_length = len(sentence)
+            if total_length + sentence_length > max_length:
+                # If this is the first sentence and it's too long, truncate it
+                if i == 0:
+                    # Find a good breaking point (end of word)
+                    truncate_at = max_length - 3  # Leave room for "..."
+                    if truncate_at > 0:
+                        # Find last space before limit
+                        last_space = sentence[:truncate_at].rfind(' ')
+                        if last_space > 0:
+                            result_sentences.append(sentence[:last_space] + "...")
+                        else:
+                            result_sentences.append(sentence[:truncate_at] + "...")
+                break
+            
+            # Add the sentence
+            result_sentences.append(sentence)
+            total_length += sentence_length
+            
+            # If first sentence is over 150 chars, stop here
+            if i == 0 and sentence_length > 150:
+                break
+        
+        # Join sentences with proper spacing
+        if result_sentences:
+            result = ' '.join(result_sentences)
+            # Ensure it ends with proper punctuation
+            if result and result[-1] not in '.!?':
+                result += '.'
+            return result
+        
+        # Fallback: return truncated text if no sentences found
+        if text:
+            if len(text) <= max_length:
+                return text
+            else:
+                truncate_at = max_length - 3
+                last_space = text[:truncate_at].rfind(' ')
+                if last_space > 0:
+                    return text[:last_space] + "..."
+                return text[:truncate_at] + "..."
+        
+        return ""
+    
+    def _create_strategic_relevance_explanation(
+        self,
+        key_insights: List[str],
+        strategic_implications: List[str], 
+        matched_entities: List[str],
+        matched_keywords: List[str],
+        strategic_alignment: float,
+        competitive_impact: float,
+        urgency_score: float
+    ) -> str:
+        """
+        Create relevance explanation using actual strategic insights from AI analysis.
+        Returns empty string if no real insights are available.
+        """
+        explanations = []
+        
+        # Use actual strategic insights if available
+        if key_insights and len(key_insights) > 0:
+            # Extract complete sentences from the first key insight
+            primary_insight = self._extract_complete_sentences(
+                key_insights[0], 
+                max_sentences=2,
+                max_length=150
+            )
+            if primary_insight:
+                explanations.append(primary_insight)
+        
+        # Add strategic implications if available
+        if strategic_implications and len(strategic_implications) > 0:
+            # Extract complete sentences from implications (shorter limit)
+            primary_implication = self._extract_complete_sentences(
+                strategic_implications[0],
+                max_sentences=1,
+                max_length=100
+            )
+            if primary_implication and primary_implication not in explanations:
+                explanations.append(primary_implication)
+        
+        # Return empty string if no real insights available - no generic fallbacks
+        if not explanations:
+            return ""
+        
+        # Join explanations and ensure total length is within limits
+        result = "; ".join(explanations)
+        
+        # Final safety check on total length
+        if len(result) > 250:
+            # Re-extract with stricter limits
+            result = self._extract_complete_sentences(result, max_sentences=2, max_length=250)
+        
+        return result
     
     async def _get_strategic_insights(
         self, 
@@ -529,6 +694,14 @@ class ReportService(BaseIntelligenceService):
 """
             
             for item in section.items:
+                # Only show relevance explanation if we have actual AI insights
+                relevance_html = ""
+                if item.relevance_explanation.strip():
+                    relevance_html = f"""
+                    <div class="article-relevance">
+                        Relevant because: {item.relevance_explanation}
+                    </div>"""
+                
                 html_content += f"""
                 <div class="article">
                     <div class="article-title">
@@ -536,10 +709,7 @@ class ReportService(BaseIntelligenceService):
                     </div>
                     <div class="article-meta">
                         Source: {item.source_name} | Published: {item.published_at.strftime('%m/%d/%Y')} | Score: {item.overall_score:.2f}
-                    </div>
-                    <div class="article-relevance">
-                        Relevant because: {item.relevance_explanation}
-                    </div>
+                    </div>{relevance_html}
                 </div>
 """
             
@@ -656,6 +826,11 @@ class ReportService(BaseIntelligenceService):
             
             # Add top 5 items for dashboard preview
             for item in section.items[:5]:
+                # Only include relevance summary if we have actual AI insights
+                relevance_summary = ""
+                if item.relevance_explanation.strip():
+                    relevance_summary = item.relevance_explanation[:150] + "..." if len(item.relevance_explanation) > 150 else item.relevance_explanation
+                
                 preview_item = {
                     "content_id": item.content_id,
                     "title": item.title[:100] + "..." if len(item.title) > 100 else item.title,
@@ -663,7 +838,7 @@ class ReportService(BaseIntelligenceService):
                     "source": item.source_name,
                     "published_date": item.published_at.strftime('%Y-%m-%d'),
                     "score": round(item.overall_score, 2),
-                    "relevance_summary": item.relevance_explanation[:150] + "..." if len(item.relevance_explanation) > 150 else item.relevance_explanation,
+                    "relevance_summary": relevance_summary,
                     "tags": {
                         "entities": item.matched_entities[:3],
                         "focus_areas": item.matched_focus_areas[:3]
