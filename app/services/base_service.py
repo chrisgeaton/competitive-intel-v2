@@ -72,12 +72,18 @@ class BaseIntelligenceService:
             focus_result = await db.execute(focus_query)
             focus_areas = focus_result.scalars().all()
             
-            # Get entity tracking
-            entity_query = select(UserEntityTracking).where(
+            # Get entity tracking with entity names
+            from app.models.tracking import TrackingEntity
+            entity_query = select(UserEntityTracking, TrackingEntity.name).join(
+                TrackingEntity, UserEntityTracking.entity_id == TrackingEntity.id
+            ).where(
                 UserEntityTracking.user_id == user_id
             ).order_by(desc(UserEntityTracking.priority))
             entity_result = await db.execute(entity_query)
-            entities = entity_result.scalars().all()
+            entity_rows = entity_result.fetchall()
+            
+            # Get delivery preferences
+            delivery_prefs = await self.get_user_delivery_preferences(db, user_id)
             
             return {
                 "user_name": user_row.name if user_row else "User",
@@ -96,13 +102,18 @@ class BaseIntelligenceService:
                 ],
                 "tracked_entities": [
                     {
-                        "entity_name": entity.entity_name,
-                        "entity_type": entity.entity_type,
-                        "priority": entity.priority,
-                        "keywords": entity.keywords
+                        "entity_name": entity_row[1],  # entity_name from join
+                        "entity_type": getattr(entity_row[0], 'entity_type', 'unknown'),
+                        "priority": entity_row[0].priority,
+                        "keywords": getattr(entity_row[0], 'custom_keywords', []) or []
                     }
-                    for entity in entities
-                ]
+                    for entity_row in entity_rows
+                ],
+                "delivery_preferences": {
+                    "max_articles_per_report": delivery_prefs.max_articles_per_report if delivery_prefs else 10,
+                    "frequency": delivery_prefs.frequency if delivery_prefs else "daily",
+                    "content_format": delivery_prefs.content_format if delivery_prefs else "executive_summary"
+                }
             }
             
         except Exception as e:

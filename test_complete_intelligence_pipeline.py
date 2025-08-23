@@ -29,15 +29,21 @@ async def setup_test_data():
     
     async with db_manager.get_session() as db:
         # Get test user
-        user_query = select(User).where(User.email == "test@example.com")
+        user_query = select(User).where(User.email == "ceaton@livedata.com")
         result = await db.execute(user_query)
         user = result.scalar_one_or_none()
         
         if not user:
-            print("ERROR: Test user not found")
+            print("ERROR: Test user ceaton@livedata.com not found")
             return None
         
-        # Clean existing data for clean test
+        # Clean existing data for clean test (order matters due to foreign keys)
+        from app.models.analysis import StrategicInsight
+        await db.execute(delete(StrategicInsight).where(
+            StrategicInsight.analysis_result_id.in_(
+                select(AnalysisResult.id).where(AnalysisResult.user_id == user.id)
+            )
+        ))
         await db.execute(delete(AnalysisResult).where(AnalysisResult.user_id == user.id))
         await db.execute(delete(DiscoveredContent).where(DiscoveredContent.user_id == user.id))
         
@@ -221,7 +227,7 @@ async def validate_email_content():
     
     # Get user
     async with db_manager.get_session() as db:
-        user_query = select(User).where(User.email == "test@example.com")
+        user_query = select(User).where(User.email == "ceaton@livedata.com")
         result = await db.execute(user_query)
         user = result.scalar_one_or_none()
         

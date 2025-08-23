@@ -2,6 +2,10 @@
 """Send actual email to prove system works."""
 
 import sendgrid
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from sendgrid.helpers.mail import Mail, To, From, Subject, HtmlContent, Content
 from app.config import settings
 

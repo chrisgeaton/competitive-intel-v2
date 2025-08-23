@@ -82,14 +82,13 @@ class AnalysisService(BaseAnalysisService, ValidationMixin, ErrorHandlingMixin, 
                     expected="Positive integer"
                 )
             
-            # Check centralized cache
-            if not force_refresh:
+            # Check legacy cache
+            if not force_refresh and user_id in self._user_context_cache:
                 try:
-                    cached_context = self.cache_manager.get_user_context(user_id)
-                    if cached_context is not None:
-                        # Validate cached context
-                        validate_analysis_context(cached_context)
-                        return cached_context
+                    cached_context = self._user_context_cache[user_id]
+                    # Validate cached context
+                    validate_analysis_context(cached_context)
+                    return cached_context
                 except Exception as e:
                     self.logger.warning(f"Cache error for user {user_id}: {e}")
                     # Continue with database load
@@ -146,16 +145,16 @@ class AnalysisService(BaseAnalysisService, ValidationMixin, ErrorHandlingMixin, 
             # Validate loaded context
             validate_analysis_context(context)
             
-            # Cache using centralized manager
+            # Cache using legacy cache
             try:
-                self.cache_manager.set_user_context(user_id, context)
+                self._user_context_cache[user_id] = context
             except Exception as e:
                 self.logger.warning(f"Failed to cache user context for {user_id}: {e}")
                 # Don't fail if caching fails
             
             return context
             
-        except AnalysisException:
+        except ValueError:
             raise
         except Exception as e:
             self.logger.error(f"Unexpected error loading user context for {user_id}: {e}")
@@ -632,7 +631,7 @@ class AnalysisService(BaseAnalysisService, ValidationMixin, ErrorHandlingMixin, 
             
             return analysis_results
             
-        except AnalysisException:
+        except ValueError:
             raise
         except Exception as e:
             self.logger.error(f"Deep analysis failed for batch {batch.batch_id}: {e}")
@@ -770,7 +769,7 @@ class AnalysisService(BaseAnalysisService, ValidationMixin, ErrorHandlingMixin, 
                     error_code=AnalysisErrorCode.AI_PROVIDER_UNAVAILABLE
                 )
             
-        except AnalysisException:
+        except ValueError:
             raise
         except Exception as e:
             self.logger.error(f"Unexpected error in analysis stage {stage.value}: {e}")

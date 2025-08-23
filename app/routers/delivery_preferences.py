@@ -189,7 +189,7 @@ async def create_or_update_delivery_preferences(
             await db_helpers.safe_commit(db, "delivery preferences update")
             await db.refresh(existing)
             
-            logger.info(f"Delivery preferences updated for user {current_user.email}")
+            logging.getLogger(__name__).info(f"Delivery preferences updated for user {current_user.email}")
             # Return raw dict to bypass FastAPI response validation
             return {
                 "id": existing.id,
@@ -230,7 +230,7 @@ async def create_or_update_delivery_preferences(
             await db_helpers.safe_commit(db, "delivery preferences creation")
             await db.refresh(new_preferences)
             
-            logger.info(f"Delivery preferences created for user {current_user.email}")
+            logging.getLogger(__name__).info(f"Delivery preferences created for user {current_user.email}")
             # Return raw dict to bypass FastAPI response validation
             return {
                 "id": new_preferences.id,
@@ -270,7 +270,7 @@ async def reset_delivery_preferences(
         
         if existing:
             await db_helpers.safe_delete(db, existing, "reset delivery preferences")
-            logger.info(f"Delivery preferences reset for user {current_user.email}")
+            logging.getLogger(__name__).info(f"Delivery preferences reset for user {current_user.email}")
         
         return {"message": "Delivery preferences reset to defaults"}
     
