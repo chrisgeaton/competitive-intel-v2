@@ -1,5 +1,7 @@
 # Competitive Intelligence Platform
 
+> **Status: archived.** Built as a standalone competitive-intelligence platform, then superseded when native Claude skills and scheduled tasks made most of this workflow achievable without a custom app. Kept public as a code sample. Knowing when a platform update has obsoleted your own build is part of the job.
+
 A competitive intelligence platform with real-time content discovery, AI-powered analysis, and automated strategic report delivery. Features JWT authentication, RSS monitoring, OpenAI GPT-4 integration, and email reporting via SendGrid.
 
 ## 🚀 Quick Start
